@@ -22,9 +22,9 @@ class ThreadPool
 private:
     bool ending; //no more work to do
     std::mutex queuemutex;
-    std::condition_variable workqueuecondvar;
+    std::condition_variable work_queuecondvar;
     std::vector<std::thread> threads;
-    std::queue< std::pair<std::function<T_OUT( T_IN )>, T_IN> > workqueue;
+    std::queue< std::pair<std::function<T_OUT( T_IN )>, T_IN> > work_queue;
 
     void WorkLoop();
 public:
@@ -38,7 +38,8 @@ public:
     void AddWork(const std::function<T_OUT( T_IN )>& work, T_IN argumentptr);
     bool Busy();
     bool ResultsLeftToCollect();
-    int GetQueueSize();
+    int GetResultQueueSize();
+    int GetWorkQueueSize();
 };
 
 
@@ -62,7 +63,7 @@ ThreadPool<T_IN, T_OUT>::~ThreadPool()
     }
 
     //wake up all threads
-    workqueuecondvar.notify_all();
+    work_queuecondvar.notify_all();
     for( auto& thread : threads )
     {
         if( thread.joinable() )
@@ -76,10 +77,10 @@ void ThreadPool<T_IN, T_OUT>::AddWork(const std::function<T_OUT( T_IN )>& work, 
     {
         std::unique_lock<std::mutex> lock(queuemutex);
 
-        workqueue.push( std::make_pair(work, std::move(argument)) );
+        work_queue.push( std::make_pair(work, std::move(argument)) );
     }
 
-    workqueuecondvar.notify_one();
+    work_queuecondvar.notify_one();
 }
 
 template<typename T_IN, typename T_OUT>
@@ -92,13 +93,13 @@ void ThreadPool<T_IN, T_OUT>::WorkLoop()
 
         {
             std::unique_lock<std::mutex> lock(queuemutex);
-            workqueuecondvar.wait( lock, [&] { return !workqueue.empty() || ending; });
+            work_queuecondvar.wait( lock, [&] { return !work_queue.empty() || ending; });
 
             if( ending ) break;
 
-            work = workqueue.front().first;
-            argument = std::move(workqueue.front().second);
-            workqueue.pop();            
+            work = work_queue.front().first;
+            argument = std::move(work_queue.front().second);
+            work_queue.pop();            
         }
 
         //std::cout << "gave work to id=(" << std::this_thread::get_id() << ")\n";
@@ -124,8 +125,8 @@ bool ThreadPool<T_IN, T_OUT>::Busy()
     bool poolbusy;
     {
         std::unique_lock<std::mutex> lock(queuemutex);
-        poolbusy = !workqueue.empty();
-        //printf("queue size:%d\n", (int)workqueue.size());
+        poolbusy = !work_queue.empty();
+        //printf("queue size:%d\n", (int)work_queue.size());
     }
     return poolbusy;
 }
@@ -133,18 +134,34 @@ bool ThreadPool<T_IN, T_OUT>::Busy()
 template<typename T_IN, typename T_OUT>
 bool ThreadPool<T_IN, T_OUT>::ResultsLeftToCollect()
 {
-    bool poolbusy;
+    bool resultempty;
     {
         std::unique_lock<std::mutex> lock(result_mutex);
-        poolbusy = !result_queue.empty();
+        resultempty = !result_queue.empty();
+        std::cout << "[POOL] anything to collect?:" << resultempty << "\n";
     }
-    return poolbusy;
+    return resultempty;
 }
 
 template<typename T_IN, typename T_OUT>
-int ThreadPool<T_IN, T_OUT>::GetQueueSize()
+int ThreadPool<T_IN, T_OUT>::GetResultQueueSize()
 {
-    std::unique_lock<std::mutex> lock(queuemutex);
-    //printf("queue size:%d\n", (int)workqueue.size());
-    return (int)workqueue.size();
+    int s;
+    {
+        std::unique_lock<std::mutex> lock(result_mutex);
+        s = (int)result_queue.size();
+    }
+    return s;
+}
+
+template<typename T_IN, typename T_OUT>
+int ThreadPool<T_IN, T_OUT>::GetWorkQueueSize()
+{
+    int s;
+    {
+        std::unique_lock<std::mutex> lock(queuemutex);
+        //printf("queue size:%d\n", (int)work_queue.size());
+        s = (int)work_queue.size();
+    }
+    return s;
 }

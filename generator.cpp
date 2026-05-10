@@ -70,10 +70,10 @@ void CasesGenerator::start_generator()
 
 double CasesGenerator::get_progress()
 {
+    printf(" (%d) ", (int)possible_rows.size());
     for(int i = 0; i < N; i++)
         printf("[%d: %d] ", i, rows_gen_idx[i]);
-    printf(" /%d\n", (int)possible_rows.size());
-    return (100.0 * (double)rows_gen_idx[0]) / (double)possible_rows.size();
+    return (100.0 * (double)(rows_gen_idx[0] - startidx)) / (double)(endidx - startidx);
 }
 
 std::vector<Sub> CasesGenerator::get_possible_rows()
@@ -261,10 +261,10 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
 
                 //make canonical form (sorted rows)
                 for(int r = std::max(current_row_idx + 1, 2); r < n; r++)
-                    rows_gen_idx[r] = rows_gen_idx[r-1] + 1;
+                    rows_gen_idx[r] = std::min(rows_gen_idx[r-1] + 1, possible_rows_size - 1);
             }
 
-            if( rows_gen_idx[0] >= possible_rows_size ) //no more combinations left
+            if( rows_gen_idx[0] >= endidx ) //no more combinations left
             {
                 all_generated = true;
                 break;
@@ -317,10 +317,10 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
             }
 
             for(int r = std::max(last_r, 2); r < n; r++)
-                rows_gen_idx[r] = rows_gen_idx[r-1] + 1;
+                rows_gen_idx[r] = std::min(rows_gen_idx[r-1] + 1, possible_rows_size - 1);
         }
 
-        if( rows_gen_idx[0] >= possible_rows_size )
+        if( rows_gen_idx[0] >= endidx )
         {
             all_generated = true;
             break;

@@ -14,19 +14,18 @@ class CasesGenerator
 {
 private:
     int n, m, ones_lower_bound, ones_upper_bound;
-    int startidx, endidx;
     bool is_inverted;
     LLI firstcolmask;
     std::vector<Sub> possible_rows;
     int rows_gen_idx[8];
 public:
     bool all_generated;
+    int startidx, endidx;
 
-    //CasesGenerator(int, int, int, int, bool, int, int);
     CasesGenerator(){}
-    CasesGenerator(int n_, int m_, int ones_lower_bound_, int ones_upper_bound_, bool is_inverted_, int startidx_, int range_idx_) : n(n_),
-        m(m_), ones_lower_bound(ones_lower_bound_), ones_upper_bound(ones_upper_bound_), startidx(startidx_), 
-        endidx{startidx_+range_idx_}, is_inverted(is_inverted_)
+    CasesGenerator(int n_, int m_, int ones_lower_bound_, int ones_upper_bound_, bool is_inverted_, int startidx_, int end_idx_) : n(n_),
+        m(m_), ones_lower_bound(ones_lower_bound_), ones_upper_bound(ones_upper_bound_), is_inverted(is_inverted_), startidx(startidx_), 
+        endidx(end_idx_)
     {}
 
     std::unique_ptr<std::vector<Sub>> generate_with_ones_batch(int,bool);

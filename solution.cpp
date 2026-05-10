@@ -593,71 +593,7 @@ std::pair<bool, int> cycle_backwards(Sub start)
     return std::make_pair(true, steps);
 }
 
-std::vector<Sub> generate_with_ones(int n, int ones_lower_bound, int ones_upper_bound, bool canonical)
-{
-    std::vector<Sub> w;
-    w.push_back(0);
-
-    std::vector<Sub> possible_rows;
-    for(Sub s = 0ULL; s < (Sub)(1ULL << (LLI)n); s++)
-        if( (ones_lower_bound <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= ones_upper_bound) )
-            possible_rows.push_back(s);
-
-    for(int rowidx = 0; rowidx < n; rowidx++)
-    {
-        std::vector<Sub> tempw;
-        for(int i = 0; i < (int)w.size(); i++)
-        {
-            Sub s = w[i];
-            for(int j = 0; j < (int)possible_rows.size(); j++)
-            {
-                Sub rownew = possible_rows[j];
-                Sub snew = set_row_as(rownew, rowidx) | s;
-
-                if( canonical && rowidx > 1 ) //canonical form only for row 1 and higher
-                {
-                    Sub slastrow = get_row_to_zero(s, rowidx - 1);
-                    if( slastrow > rownew )
-                        continue;
-                }
-
-                if( rowidx < ones_lower_bound )
-                {
-                    tempw.push_back(snew);
-                }
-                else
-                {
-                    //check columns probably can be done better
-                    bool ok = true;
-                    for(int col = 0; col < n; col++)
-                        if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
-                            ok = false;
-                    if( ok )
-                        tempw.push_back(snew);
-                }
-            }
-        }
-        w = tempw;
-        printf("row idx:%d, size:%d\n", rowidx, (int)w.size());
-    }
-
-    std::vector<Sub> result;
-    for(int i = 0; i < (int)w.size(); i++)
-    {
-        bool ok = true;
-        for(int col = 0; col < n; col++)
-            if( ones_lower_bound > __builtin_popcountll(get_col(w[i], col)) )
-                ok = false;
-        if( ok )
-            result.push_back(w[i]);
-    }
-
-    printf("result size:%d\n", (int)result.size());
-
-    return result;
-}
-
-int batch_size = 10000, batch_it = 0;
+int batch_size = 10000;
 
 std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> batch)
 {
@@ -666,7 +602,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
     if( batch -> size() == 0 )
         return std::make_pair(0ULL, input_wrong);
 
-    //printf("processing batch starting with %llu\n", batch[0]);
+    //printf("processing batch starting with %llu\n", batch -> at(0));
     for(int i = 0; i < (int)(batch -> size()); i++)
     {
         Sub val = batch -> at(i);
@@ -690,7 +626,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
 
         if(val != check(result.first, result.second.first, result.second.second))
         {
-            printf("(%llu)check is wrong\n", val);
+            printf("(%llu) check is wrong (batch start:%llu)\n", val, batch -> at(0));
             input_wrong.push_back(val);
         }
     }
@@ -698,11 +634,11 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
     return std::make_pair(batch -> at(0), input_wrong);
 }
 
-/*std::pair< std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>> > generate_batch(std::unique_ptr<CasesGenerator> gen)
+std::pair< std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>> > generate_batch(std::unique_ptr<CasesGenerator> gen)
 {
     std::unique_ptr<std::vector<Sub>> result = gen -> generate_with_ones_batch(batch_size, true);
-    return make_pair(gen, result);
-}*/
+    return make_pair(std::move(gen), std::move(result));
+}
 
 int main(int argc, char** argv)
 {
@@ -728,10 +664,9 @@ int main(int argc, char** argv)
         }
     }
 
+    bool is_inverted = false;
     int howmanyones_lower, howmanyones_upper;
     scanf("%d %d %d", &N, &howmanyones_lower, &howmanyones_upper);
-    //N = 7;
-    //howmanyones_lower = 2; howmanyones_upper = 3;
     M = N;
 
     for(int i = 0; i < N; i++)
@@ -745,7 +680,7 @@ int main(int argc, char** argv)
     srand(67);
     std::random_shuffle(rowmoves.begin(), rowmoves.end());
 
-    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, false, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, is_inverted, 0, 1000);
     mygenerator.start_generator();
 
     /*while(!mygenerator.all_generated)
@@ -783,37 +718,111 @@ int main(int argc, char** argv)
 
     std::vector<Sub> wrong;
 
-    ThreadPool<std::unique_ptr<std::vector<Sub>>, std::pair<Sub, std::vector<Sub>>>* solve_thread_pool = 
+    ThreadPool< std::unique_ptr<std::vector<Sub>>, std::pair<Sub, std::vector<Sub>> >* solve_thread_pool = 
         new ThreadPool<std::unique_ptr<std::vector<Sub>>, std::pair<Sub, std::vector<Sub>>>(number_of_threads);
 
-    ThreadPool<CasesGenerator, std::unique_ptr<std::vector<Sub>>>* generate_thread_pool = 
-        new ThreadPool<CasesGenerator, std::unique_ptr<std::vector<Sub>>>(number_of_generating_threads);
+    ThreadPool< std::unique_ptr<CasesGenerator>, std::pair<std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>>> >* generate_thread_pool = 
+        new ThreadPool< std::unique_ptr<CasesGenerator>, std::pair<std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>>> >(number_of_generating_threads);
 
-    for(int i = 0; i < number_of_threads; i++)
+
+    int possible_rows_size = mygenerator.get_possible_rows().size();
+    int possible_rows_portion = possible_rows_size / number_of_generating_threads;
+    printf("possible size:%d, portion:%d\n", possible_rows_size, possible_rows_portion);
+    for(int i = 0; i < number_of_generating_threads; i++)
     {
-        if(!mygenerator.all_generated)
-        {
-            std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size,true);
-            calculated[v -> at(0)] = false;
-            count_generated ++;
-            solve_thread_pool -> AddWork(processbatch, std::move(v));
-        }
+        int s = i * possible_rows_portion;
+        int e = (i == number_of_generating_threads - 1) ? possible_rows_size : ((i + 1) * possible_rows_portion - 1);
+        printf("%d: %d, %d\n", i, s, e);
+        std::unique_ptr<CasesGenerator> g = std::make_unique<CasesGenerator>(N, M, howmanyones_lower, howmanyones_upper, is_inverted, s, e);
+        g -> start_generator();
+        generate_thread_pool -> AddWork(generate_batch, std::move(g));
     }
 
     printf("begin while\n");
 
-    while( solve_thread_pool -> Busy() || solve_thread_pool -> ResultsLeftToCollect() || count_collected < count_generated )
+    int generators_finished = 0;
+    while( generators_finished < number_of_generating_threads )
     {
+        std::vector<std::unique_ptr<CasesGenerator>> ready_generators;
+
+        {
+            std::unique_lock<std::mutex> lock(generate_thread_pool -> result_mutex);
+            //generate_thread_pool->some_work_ended.wait(lock);
+            generate_thread_pool->some_work_ended.wait(lock, [&]{ return (generate_thread_pool -> result_queue.size()) > 0; });
+
+            while( !(generate_thread_pool -> result_queue).empty() )
+            {
+                std::pair< std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>> > gen_res = std::move((generate_thread_pool -> result_queue).front());
+                (generate_thread_pool -> result_queue).pop();
+
+                std::cout << "[MAIN] generated batch " << count_generated << ", START: " << ((gen_res.second -> size() > 0) ? gen_res.second -> at(0) : 0 )   
+                << ", ID:" << gen_res.first -> startidx << "| progress estimation:" << gen_res.first -> get_progress() << "\n";
+
+                std::cout << "generated size: " << gen_res.second -> size() << ", all_generated:" << gen_res.first -> all_generated << "\n";
+
+                if( !(gen_res.first -> all_generated) )
+                {
+                    ready_generators.push_back(std::move(gen_res.first));
+
+                    count_generated++;
+                    calculated[gen_res.second -> at(0)] = false;
+
+                    solve_thread_pool -> AddWork(processbatch, std::move(gen_res.second));
+                }
+                else
+                {
+                    generators_finished ++;
+                    continue;
+                }
+            }
+        }
+
+        for(int i = 0; i < (int)ready_generators.size(); i++)
+            generate_thread_pool -> AddWork(generate_batch, std::move(ready_generators[i]));
+        
+        std::cout << "[MAIN] work waiting: " << solve_thread_pool -> GetWorkQueueSize() << ", results left to collect: " << solve_thread_pool -> GetResultQueueSize() << "\n";
+
+
+        // --------- gathering results -----------
+        /*while(solve_thread_pool -> ResultsLeftToCollect())
         {
             std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
-            solve_thread_pool->some_work_ended.wait(lock);
+
+            std::pair<Sub, std::vector<Sub>> result = (solve_thread_pool -> result_queue).front();
+            (solve_thread_pool -> result_queue).pop();
+
+            std::cout << "[MAIN] got batch " << count_collected << ", START: " << result.first << "\n";
+
+            calculated[result.first] = true;
+            count_collected++;
+
+            if( result.second.size() > 0 )
+            {
+                //WRONG!!!
+                for(int i = 0; i < (int)result.second.size(); i++)
+                    wrong.push_back(result.second[i]);
+            }
+        }*/
+    }
+
+    std::cout << "[MAIN] ENDED GENERATING   is busy?:" << solve_thread_pool -> Busy() << ", result queue size:" << solve_thread_pool -> GetResultQueueSize() << "\n";
+
+    while( count_collected < count_generated )
+    {
+        {
+            // a co jak nie dostanie notify bo wszystko juz policzone?
+            std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
+            //solve_thread_pool->some_work_ended.wait(lock);
+            solve_thread_pool->some_work_ended.wait(lock, [&]{ return (solve_thread_pool -> result_queue.size()) > 0; });
+
+            std::cout << "locked, result queue size: " << solve_thread_pool -> result_queue.size() << "\n";
             
             while( !(solve_thread_pool -> result_queue).empty() )
             {
                 std::pair<Sub, std::vector<Sub>> result = (solve_thread_pool -> result_queue).front();
                 (solve_thread_pool -> result_queue).pop();
 
-                std::cout << "[MAIN] got batch " << batch_it << ", START: " << result.first << "\n";
+                std::cout << "[MAIN] got batch " << count_collected << ", START: " << result.first << ",  collected: " << count_collected << ", generated: " << count_generated << "\n";
 
                 calculated[result.first] = true;
                 count_collected++;
@@ -824,36 +833,19 @@ int main(int argc, char** argv)
                     for(int i = 0; i < (int)result.second.size(); i++)
                         wrong.push_back(result.second[i]);
                 }
-
-                //printf("batch ok %d (%llu)\n", batch_it, result.second);
-                batch_it ++;
             }
         }
-
-        while(!mygenerator.all_generated && solve_thread_pool->GetQueueSize() < number_of_threads)
-        {
-            std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size,true);
-            calculated[v -> at(0)] = false;
-            count_generated++;
-
-            //std::cout << "generated batch START: " << v -> at(0) << "\n";
-            //for(int i = 0; i < v.size(); i++)
-            //    std::cout << v[i] << " ";
-            //std::cout << "\n";
-
-            printf("progress estimation:%lf\n", mygenerator.get_progress());
-
-            solve_thread_pool -> AddWork(processbatch, std::move(v));
-        }
-
-        solve_thread_pool -> GetQueueSize();
     }
 
-    printf("finished\n");
+    std::cout << "[MAIN] ENDED SOLVING   is busy?:" << solve_thread_pool -> Busy() << ", result queue size:" << solve_thread_pool -> GetResultQueueSize() << "\n";
 
-    solve_thread_pool -> GetQueueSize();
+    std::cout << "finished\n";
+
+    solve_thread_pool -> GetWorkQueueSize();
+    generate_thread_pool -> GetWorkQueueSize();
 
     delete solve_thread_pool;
+    delete generate_thread_pool;
 
     int not_calculated_cnt = 0;
     printf("not calculated:\n");
@@ -870,7 +862,10 @@ int main(int argc, char** argv)
 
     printf("wrong (count:%d):\n", (int)wrong.size());
     for(int i = 0; i < (int)wrong.size(); i++)
+    {
         printf("%llu\n", wrong[i]);
+        print_subset(wrong[i]);
+    }
 
     return 0;
 }
