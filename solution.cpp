@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <random>
 #include <map>
+#include <fstream>
 //#include "generator.h"
 #include "ThreadPool.h"
 #include <getopt.h>
@@ -644,9 +645,10 @@ int main(int argc, char** argv)
 {
     int number_of_threads = 1;
     int number_of_generating_threads = 1;
+    std::string output_file_name = "result.out", wrong_file_name = "wrong.out";
 
     int optc;
-    while( (optc = getopt(argc, argv, "t:g:b:") ) != -1 )
+    while( (optc = getopt(argc, argv, "t:g:b:o:e:") ) != -1 )
     {
         switch( optc )
         {
@@ -659,6 +661,12 @@ int main(int argc, char** argv)
             case 'b':
                 batch_size = atoi(optarg);
                 break;
+            case 'o':
+                output_file_name = optarg;
+                break;
+            case 'e':
+                wrong_file_name = optarg;
+                break;
             case '?':
                 break;
         }
@@ -668,6 +676,16 @@ int main(int argc, char** argv)
     int howmanyones_lower, howmanyones_upper;
     scanf("%d %d %d", &N, &howmanyones_lower, &howmanyones_upper);
     M = N;
+
+    std::ofstream output_file, wrong_file;
+    output_file.open(output_file_name);
+    wrong_file.open(wrong_file_name);
+
+    if(!output_file)
+        std::cout << "no output file!\n";
+    if(!wrong_file)
+        std::cout << "no file for counterexample subsets!\n";
+    
 
     for(int i = 0; i < N; i++)
         generalfirstcolmask += (1ULL << (LLI)(i * M));
@@ -760,14 +778,17 @@ int main(int argc, char** argv)
 
                 std::cout << "generated size: " << gen_res.second -> size() << ", all_generated:" << gen_res.first -> all_generated << "\n";
 
-                if( !(gen_res.first -> all_generated) )
+                if( gen_res.second -> size() > 0 )
                 {
-                    ready_generators.push_back(std::move(gen_res.first));
-
                     count_generated++;
                     calculated[gen_res.second -> at(0)] = false;
 
                     solve_thread_pool -> AddWork(processbatch, std::move(gen_res.second));
+                }
+
+                if( !(gen_res.first -> all_generated) )
+                {
+                    ready_generators.push_back(std::move(gen_res.first));
                 }
                 else
                 {
@@ -784,7 +805,7 @@ int main(int argc, char** argv)
 
 
         // --------- gathering results -----------
-        /*while(solve_thread_pool -> ResultsLeftToCollect())
+        while(solve_thread_pool -> ResultsLeftToCollect())
         {
             std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
 
@@ -792,6 +813,8 @@ int main(int argc, char** argv)
             (solve_thread_pool -> result_queue).pop();
 
             std::cout << "[MAIN] got batch " << count_collected << ", START: " << result.first << "\n";
+            output_file << "[MAIN] got batch " << count_collected << ", START: " << result.first << "\n";
+            output_file.flush();
 
             calculated[result.first] = true;
             count_collected++;
@@ -800,9 +823,12 @@ int main(int argc, char** argv)
             {
                 //WRONG!!!
                 for(int i = 0; i < (int)result.second.size(); i++)
+                {
+                    wrong_file << result.second[i] << "\n";
                     wrong.push_back(result.second[i]);
+                }
             }
-        }*/
+        }
     }
 
     std::cout << "[MAIN] ENDED GENERATING   is busy?:" << solve_thread_pool -> Busy() << ", result queue size:" << solve_thread_pool -> GetResultQueueSize() << "\n";
@@ -810,7 +836,6 @@ int main(int argc, char** argv)
     while( count_collected < count_generated )
     {
         {
-            // a co jak nie dostanie notify bo wszystko juz policzone?
             std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
             //solve_thread_pool->some_work_ended.wait(lock);
             solve_thread_pool->some_work_ended.wait(lock, [&]{ return (solve_thread_pool -> result_queue.size()) > 0; });
@@ -823,6 +848,8 @@ int main(int argc, char** argv)
                 (solve_thread_pool -> result_queue).pop();
 
                 std::cout << "[MAIN] got batch " << count_collected << ", START: " << result.first << ",  collected: " << count_collected << ", generated: " << count_generated << "\n";
+                output_file << "[MAIN] got batch " << count_collected << ", START: " << result.first << "\n";
+                output_file.flush();
 
                 calculated[result.first] = true;
                 count_collected++;
@@ -831,7 +858,11 @@ int main(int argc, char** argv)
                 {
                     //WRONG!!!
                     for(int i = 0; i < (int)result.second.size(); i++)
+                    {
+                        wrong_file << result.second[i] << "\n";
+                        wrong_file.flush();
                         wrong.push_back(result.second[i]);
+                    }
                 }
             }
         }
@@ -847,25 +878,35 @@ int main(int argc, char** argv)
     delete solve_thread_pool;
     delete generate_thread_pool;
 
-    int not_calculated_cnt = 0;
-    printf("not calculated:\n");
+    std::vector<Sub> not_calculated_vec;
     for(auto it = calculated.begin(); it != calculated.end(); it++)
-    {
         if( it -> second == false )
+            not_calculated_vec.push_back( it -> first );
+
+    if( (int)not_calculated_vec.size() > 0 )
+    {
+        printf("not calculated (count: %d):\n", (int)not_calculated_vec.size());
+        wrong_file << "not calculated:\n";
+        for(int i = 0; i < (int)not_calculated_vec.size(); i++)
         {
-            printf("%llu\n", it -> first);
-            print_subset(it -> first);
-            not_calculated_cnt ++;
+            printf("%llu\n", not_calculated_vec[i]);
+            print_subset(not_calculated_vec[i]);
+            wrong_file << not_calculated_vec[i] << "\n";
         }
     }
-    printf("count: %d\n", not_calculated_cnt);
 
-    printf("wrong (count:%d):\n", (int)wrong.size());
-    for(int i = 0; i < (int)wrong.size(); i++)
+    if( (int)wrong.size() > 0 )
     {
-        printf("%llu\n", wrong[i]);
-        print_subset(wrong[i]);
+        printf("wrong (count:%d):\n", (int)wrong.size());
+        for(int i = 0; i < (int)wrong.size(); i++)
+        {
+            printf("%llu\n", wrong[i]);
+            print_subset(wrong[i]);
+        }
     }
+
+    output_file.close();
+    wrong_file.close();
 
     return 0;
 }
