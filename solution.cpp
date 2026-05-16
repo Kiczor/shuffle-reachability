@@ -645,10 +645,20 @@ int main(int argc, char** argv)
 {
     int number_of_threads = 1;
     int number_of_generating_threads = 1;
+    int start_position_rows = 0, end_position_rows = 10000;
     std::string output_file_name = "result.out", wrong_file_name = "wrong.out";
 
     int optc;
-    while( (optc = getopt(argc, argv, "t:g:b:o:e:") ) != -1 )
+    /* 
+    t - number of threads
+    g - number of generating threads
+    b - batch size
+    o - output file name
+    w - wrong cases file name
+    s - starting position in rows generation
+    e - last position in rows generation
+    */
+    while( (optc = getopt(argc, argv, "t:g:b:o:w:s:e:") ) != -1 )
     {
         switch( optc )
         {
@@ -664,8 +674,14 @@ int main(int argc, char** argv)
             case 'o':
                 output_file_name = optarg;
                 break;
-            case 'e':
+            case 'w':
                 wrong_file_name = optarg;
+                break;
+            case 's':
+                start_position_rows = atoi(optarg);
+                break;
+            case 'e':
+                end_position_rows = atoi(optarg);
                 break;
             case '?':
                 break;
@@ -698,10 +714,17 @@ int main(int argc, char** argv)
     srand(67);
     std::random_shuffle(rowmoves.begin(), rowmoves.end());
 
+    int possible_rows_size = 0;
+    for(Sub s = 0LL; s < (Sub)(1LL << (LLI)M); s++)
+        if( (howmanyones_lower <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= howmanyones_upper) )
+            possible_rows_size++;
+    
+    end_position_rows = std::min(end_position_rows, possible_rows_size);
+
+    /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, is_inverted, 0, 1000);
     mygenerator.start_generator();
-
-    /*while(!mygenerator.all_generated)
+    while(!mygenerator.all_generated)
     {
         std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size);
 
@@ -742,14 +765,13 @@ int main(int argc, char** argv)
     ThreadPool< std::unique_ptr<CasesGenerator>, std::pair<std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>>> >* generate_thread_pool = 
         new ThreadPool< std::unique_ptr<CasesGenerator>, std::pair<std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>>> >(number_of_generating_threads);
 
-
-    int possible_rows_size = mygenerator.get_possible_rows().size();
-    int possible_rows_portion = possible_rows_size / number_of_generating_threads;
-    printf("possible size:%d, portion:%d\n", possible_rows_size, possible_rows_portion);
+    int my_rows_size = end_position_rows - start_position_rows + 1;
+    int my_rows_portion = my_rows_size / number_of_generating_threads;
+    printf("my rows size:%d, portion:%d\n", my_rows_size, my_rows_portion);
     for(int i = 0; i < number_of_generating_threads; i++)
     {
-        int s = i * possible_rows_portion;
-        int e = (i == number_of_generating_threads - 1) ? possible_rows_size : ((i + 1) * possible_rows_portion - 1);
+        int s = i * my_rows_portion + start_position_rows;
+        int e = (i == number_of_generating_threads - 1) ? end_position_rows : ((i + 1) * my_rows_portion - 1 + start_position_rows);
         printf("%d: %d, %d\n", i, s, e);
         std::unique_ptr<CasesGenerator> g = std::make_unique<CasesGenerator>(N, M, howmanyones_lower, howmanyones_upper, is_inverted, s, e);
         g -> start_generator();
