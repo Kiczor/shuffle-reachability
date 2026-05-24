@@ -30,6 +30,7 @@ public:
 
     std::unique_ptr<std::vector<Sub>> generate_with_ones_batch(int,bool);
     double get_progress();
+    void print_rows_progress();
     std::vector<Sub> get_possible_rows();
     std::vector<Sub> generate_with_ones();
     void start_generator();

@@ -68,12 +68,30 @@ void CasesGenerator::start_generator()
     }
 }
 
-double CasesGenerator::get_progress()
+void CasesGenerator::print_rows_progress()
 {
-    printf(" (%d) ", (int)possible_rows.size());
+    printf("\n (%d) ", (int)possible_rows.size());
     for(int i = 0; i < N; i++)
         printf("[%d: %d] ", i, rows_gen_idx[i]);
-    return (100.0 * (double)(rows_gen_idx[0] - startidx)) / (double)(endidx - startidx);
+    printf("\n");
+}
+
+double CasesGenerator::get_progress()
+{
+    if( all_generated )
+        return 100.0;
+    long long int progress = 0, multiply = 1, all = 0;
+    for(int i = N - 1; i > 0; i--)
+    {
+        progress += multiply * (LLI)rows_gen_idx[i];
+        all += multiply * (LLI)possible_rows.size();
+        multiply *= (LLI)possible_rows.size();
+    }
+    progress += multiply * (rows_gen_idx[0] - startidx);
+    all += multiply * (endidx - startidx);
+
+    return 100.0 * ((double)progress / (double)all);
+    //return (100.0 * (double)(rows_gen_idx[0] - startidx)) / (double)(endidx - startidx);
 }
 
 std::vector<Sub> CasesGenerator::get_possible_rows()

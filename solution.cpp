@@ -780,6 +780,8 @@ int main(int argc, char** argv)
 
     printf("begin while\n");
 
+    std::map<LLI, double> generator_progress;
+
     int generators_finished = 0;
     while( generators_finished < number_of_generating_threads )
     {
@@ -796,9 +798,20 @@ int main(int argc, char** argv)
                 (generate_thread_pool -> result_queue).pop();
 
                 std::cout << "[MAIN] generated batch " << count_generated << ", START: " << ((gen_res.second -> size() > 0) ? gen_res.second -> at(0) : 0 )   
-                << ", ID:" << gen_res.first -> startidx << "| progress estimation:" << gen_res.first -> get_progress() << "\n";
+                << ", ID:" << gen_res.first -> startidx << " | progress estimation: " << gen_res.first -> get_progress() << "\n";
 
-                std::cout << "generated size: " << gen_res.second -> size() << ", all_generated:" << gen_res.first -> all_generated << "\n";
+                //gen_res.first -> print_rows_progress();
+
+                generator_progress[gen_res.first -> startidx] = gen_res.first -> get_progress();
+
+                std::cout << "generators progress: ";
+                double avg = 0.0;
+                for(auto it : generator_progress)
+                {
+                    std::cout << it.second << ", ";
+                    avg += it.second;
+                }
+                std::cout << "overall: " << avg / (double)number_of_generating_threads << "\n";
 
                 if( gen_res.second -> size() > 0 )
                 {
