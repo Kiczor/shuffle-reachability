@@ -52,14 +52,6 @@ void CasesGenerator::start_generator()
             possible_rows.push_back(s);
 
     endidx = std::min(endidx, (int)possible_rows.size());
-    
-    /*for(int i = 0; i < (int)possible_rows.size(); i++)
-    {
-        printf("normal\n");
-        print_subset(possible_rows[i]);
-        printf("inverted:\n");
-        print_subset(invert_rows(possible_rows[i]));
-    }*/
 
     if( is_inverted )
     {
@@ -225,16 +217,6 @@ Sub fixed_point(Sub s)
 
 bool are_columns_sorted(Sub s)
 {
-    //printf("s (%llu):\n", s); print_subset(s);
-    Sub tmp = sort_cols(s);
-    //printf("after sort cols:\n"); print_subset(tmp);
-    tmp = sort_rows(tmp);
-    //printf("after sort rows:\n"); print_subset(tmp);
-    return tmp == s;
-}
-
-bool are_columns_sorted_old(Sub s)
-{
     for(int i = 1; i < M - 1; i++)
     {
         if( move_col(s, i, 0) > move_col(s, i + 1, 0) )
@@ -291,16 +273,6 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
                         okay = false;
             }
 
-            /*if( rows_gen_idx[0] == 0 && rows_gen_idx[1] == 1 && rows_gen_idx[2] == 2 && rows_gen_idx[3] == 3 && rows_gen_idx[4] == 4 && rows_gen_idx[5] == 5 )
-            {
-                printf("row idx:%d\ncurrent gen idx:\n", current_row_idx);
-                for(int r = 0; r < n; r++)
-                    printf("%d: %d\n", r, rows_gen_idx[r]);
-                printf("s:\n"); print_subset(s);
-                printf("new row:\n"); print_subset(new_row);
-                printf("snew (%d):\n", okay); print_subset(snew);
-            }*/
-
             if( okay )
             {
                 s = snew;
@@ -345,22 +317,13 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
         if( okay && is_any_col_subset(s, false) )
             okay = false;
 
-        if( canonical_columns && okay && !is_inverted && !are_columns_sorted_old(s) )
-            okay = false;
-
-        if( canonical_columns && okay && is_inverted && !are_columns_sorted_inv(s) )
+        if( canonical_columns && okay && !is_inverted && !are_columns_sorted(s) )
             okay = false;
 
         if( okay )
         {
             batch_progress++;
             result -> push_back(s);
-
-            /*for(int i = 0; i < N; i++)
-                printf("[%d: %d] ", i, rows_gen_idx[i]);
-            printf(" /%d\n", (int)possible_rows.size());*/
-            //printf("%llu:\n", s);
-            //print_subset(s);
         }
 
         //move to the next combination
@@ -425,16 +388,6 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch_inver
                         okay = false;
             }
 
-            /*if( rows_gen_idx[0] == 0 && rows_gen_idx[1] == 1 && rows_gen_idx[2] == 2 && rows_gen_idx[3] == 3 && rows_gen_idx[4] == 4 && rows_gen_idx[5] == 5 )
-            {
-                printf("row idx:%d\ncurrent gen idx:\n", current_row_idx);
-                for(int r = 0; r < n; r++)
-                    printf("%d: %d\n", r, rows_gen_idx[r]);
-                printf("s:\n"); print_subset(s);
-                printf("new row:\n"); print_subset(new_row);
-                printf("snew (%d):\n", okay); print_subset(snew);
-            }*/
-
             if( okay )
             {
                 s = snew;
@@ -486,12 +439,6 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch_inver
         {
             batch_progress++;
             result -> push_back(invert_cols(invert_rows(s)));
-
-            /*for(int i = 0; i < N; i++)
-                printf("[%d: %d] ", i, rows_gen_idx[i]);
-            printf(" /%d\n", (int)possible_rows.size());*/
-            //printf("%llu:\n", s);
-            //print_subset(s);
         }
 
         //move to the next combination

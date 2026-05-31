@@ -15,7 +15,7 @@ Sub sort_cols(Sub);
 Sub sort_rows(Sub);
 Sub invert_cols(Sub);
 Sub invert_rows(Sub);
-bool are_columns_sorted_old(Sub);
+bool are_columns_sorted(Sub);
 bool are_columns_sorted_inv(Sub);
 Sub sort_cols_backwards(Sub s);
 Sub sort_rows_backwards(Sub s);
