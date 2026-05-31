@@ -10,6 +10,17 @@
 
 typedef unsigned long long int Sub;
 
+//temporary
+Sub sort_cols(Sub);
+Sub sort_rows(Sub);
+Sub invert_cols(Sub);
+Sub invert_rows(Sub);
+bool are_columns_sorted_old(Sub);
+bool are_columns_sorted_inv(Sub);
+Sub sort_cols_backwards(Sub s);
+Sub sort_rows_backwards(Sub s);
+Sub fixed_point(Sub s);
+
 class CasesGenerator
 {
 private:
@@ -29,9 +40,9 @@ public:
     {}
 
     std::unique_ptr<std::vector<Sub>> generate_with_ones_batch(int,bool);
+    std::unique_ptr<std::vector<Sub>> generate_with_ones_batch_inverted(int,bool);
     double get_progress();
     void print_rows_progress();
     std::vector<Sub> get_possible_rows();
-    std::vector<Sub> generate_with_ones();
     void start_generator();
 };

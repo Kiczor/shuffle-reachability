@@ -637,7 +637,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
 
 std::pair< std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>> > generate_batch(std::unique_ptr<CasesGenerator> gen)
 {
-    std::unique_ptr<std::vector<Sub>> result = gen -> generate_with_ones_batch(batch_size, true);
+    std::unique_ptr<std::vector<Sub>> result = gen -> generate_with_ones_batch_inverted(batch_size, true);
     return make_pair(std::move(gen), std::move(result));
 }
 
@@ -688,7 +688,7 @@ int main(int argc, char** argv)
         }
     }
 
-    bool is_inverted = false;
+    bool is_inverted = true;
     int howmanyones_lower, howmanyones_upper;
     scanf("%d %d %d", &N, &howmanyones_lower, &howmanyones_upper);
     M = N;
@@ -737,22 +737,35 @@ int main(int argc, char** argv)
         
     }return 0;*/
 
-    /*int gensize = 0;
-    while(!mygenerator.all_generated)
-    {
-        gensize += mygenerator.generate_with_ones_batch(batch_size, false) -> size();
-        printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
-    }
-    printf("how many: %d\n", gensize);
-
-    mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, true, 0, 1000);
-    gensize = 0;
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, false, 0, 1000);
+    mygenerator.start_generator();
+    int gensize = 0;
     while(!mygenerator.all_generated)
     {
         gensize += mygenerator.generate_with_ones_batch(batch_size, true) -> size();
         printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
     }
-    printf("how many: %d\n", gensize); return 0;*/
+    printf("how many not inverted: %d\n", gensize); return 0;
+
+    mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, true, 0, 1000);
+    mygenerator.start_generator();
+    gensize = 0;
+    while(!mygenerator.all_generated)
+    {
+        gensize += mygenerator.generate_with_ones_batch_inverted(batch_size, true) -> size();
+        printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
+    }
+    printf("how many inverted: %d\n", gensize); return 0;*/
+
+    /*mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, false, 0, 1000);
+    mygenerator.start_generator();
+    gensize = 0;
+    while(!mygenerator.all_generated)
+    {
+        gensize += mygenerator.generate_with_ones_batch(batch_size, false) -> size();
+        printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
+    }
+    printf("how many columns not canon: %d\n", gensize); return 0;*/
 
     std::map<Sub, bool> calculated;
     int count_generated = 0, count_collected = 0;

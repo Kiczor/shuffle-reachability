@@ -65,6 +65,7 @@ void CasesGenerator::start_generator()
     {
         for(int i = 0; i < (int)possible_rows.size(); i++)
             possible_rows[i] = invert_rows(possible_rows[i]);
+        std::reverse( possible_rows.begin(), possible_rows.end() );
     }
 }
 
@@ -181,6 +182,47 @@ Sub sort_cols(Sub s)
     return result;
 }
 
+Sub sort_rows_backwards(Sub s)
+{
+    std::vector<Sub> v; v.reserve(N-1);
+    for(int i = 1; i < N; i++)
+        v.push_back(get_row_to_zero(s, i));
+
+    std::sort(v.begin(), v.end(), [](const int &a, const int &b){ return a > b; });
+
+    Sub result = get_row(s, 0);
+    for(int i = 1; i < N; i++)
+        result |= move_row(v[i - 1], 0, i);
+    return result;
+}
+
+Sub sort_cols_backwards(Sub s)
+{
+    std::vector<Sub> v; v.reserve(M-1);
+    for(int i = 1; i < M; i++)
+        v.push_back(get_col(s, i) >> i);
+
+    std::sort(v.begin(), v.end(), [](const int &a, const int &b){ return a > b; });
+
+    Sub result = get_col(s, 0);
+    for(int i = 1; i < M; i++)
+        result |= move_col(v[i - 1], 0, i);
+    return result;
+}
+
+Sub fixed_point(Sub s)
+{
+    while(true)
+    {
+        Sub tmp = sort_rows(sort_cols(s));
+        //tmp = sort_rows_backwards(sort_cols_backwards(tmp));
+        if( tmp == s ) return s;
+        s = tmp;
+    }
+
+    return s;
+}
+
 bool are_columns_sorted(Sub s)
 {
     //printf("s (%llu):\n", s); print_subset(s);
@@ -204,14 +246,18 @@ bool are_columns_sorted_old(Sub s)
 bool are_columns_sorted_inv(Sub s)
 {
     //printf("s(%llu):\n",s); print_subset(s);
+    //printf("equivalent to: %llu\n", invert_rows(s)); print_subset(invert_rows(s));
 
     s = invert_cols(s);
 
     //printf("inverted:\n"); print_subset(s);
 
-    for(int i = 1; i < M - 1; i++)
+    for(int i = 0; i < M - 2; i++)
     {
-        if( move_col(s, i, 0) > move_col(s, i + 1, 0) )
+        //printf("%d:\n", i);
+        //printf("%lld:\n", move_col(s, i, 0)); print_subset(move_col(s, i, 0));
+        //printf("%lld:\n", move_col(s, i + 1, 0)); print_subset(move_col(s, i + 1, 0));
+        if( move_col(s, i, 0) < move_col(s, i + 1, 0) )
             return false;
     }
     return true;
@@ -238,7 +284,7 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
             if( is_any_row_subset(snew, current_row_idx) )
                 okay = false;
 
-            if( current_row_idx >= ones_lower_bound && okay )
+            if( current_row_idx >= ones_upper_bound && okay )
             {
                 for(int col = 0; col < m; col++)
                     if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
@@ -348,61 +394,133 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
     return result;
 }
 
-std::vector<Sub> CasesGenerator::generate_with_ones()
+std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch_inverted(int batch_size, bool canonical_columns)
 {
-    std::vector<Sub> w;
-    w.push_back(0);
+    std::unique_ptr<std::vector<Sub>> result = std::make_unique<std::vector<Sub>>();
+    result -> reserve(batch_size);
 
-    for(int rowidx = 0; rowidx < n; rowidx++)
+    int possible_rows_size = (int)possible_rows.size();
+    for(int batch_progress = 0; batch_progress < batch_size; )
     {
-        std::vector<Sub> tempw;
-        for(int i = 0; i < (int)w.size(); i++)
+        Sub s = 0ULL;
+        int current_row_idx = 0;
+        while(current_row_idx < n)
         {
-            Sub s = w[i];
-            for(int j = 0; j < (int)possible_rows.size(); j++)
+            Sub new_row = possible_rows[rows_gen_idx[current_row_idx]];
+            Sub snew = s;
+            snew |= set_row_as(new_row, current_row_idx);
+
+            bool okay = true;
+
+            if( is_any_row_subset(snew, current_row_idx) )
+                okay = false;
+
+            if( !are_columns_sorted_inv(s) )
+                okay = false;
+
+            if( current_row_idx >= ones_upper_bound && okay )
             {
-                Sub rownew = possible_rows[j];
-                Sub snew = set_row_as(rownew, rowidx) | s;
+                for(int col = 0; col < m; col++)
+                    if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
+                        okay = false;
+            }
 
-                if( rowidx > 1 ) //canonical form only for row 1 and higher
+            /*if( rows_gen_idx[0] == 0 && rows_gen_idx[1] == 1 && rows_gen_idx[2] == 2 && rows_gen_idx[3] == 3 && rows_gen_idx[4] == 4 && rows_gen_idx[5] == 5 )
+            {
+                printf("row idx:%d\ncurrent gen idx:\n", current_row_idx);
+                for(int r = 0; r < n; r++)
+                    printf("%d: %d\n", r, rows_gen_idx[r]);
+                printf("s:\n"); print_subset(s);
+                printf("new row:\n"); print_subset(new_row);
+                printf("snew (%d):\n", okay); print_subset(snew);
+            }*/
+
+            if( okay )
+            {
+                s = snew;
+                current_row_idx++;
+            }
+            else
+            {
+                rows_gen_idx[current_row_idx]++;
+            
+                //when row idx requires backtracking
+                if( rows_gen_idx[current_row_idx] >= possible_rows_size )
                 {
-                    Sub slastrow = get_row_to_zero(s, rowidx - 1);
-                    if( slastrow > rownew )
-                        continue;
+                    while(current_row_idx > 0 && rows_gen_idx[current_row_idx] >= possible_rows_size)
+                    {
+                        rows_gen_idx[current_row_idx] = 0;
+
+                        current_row_idx --;
+                        s = zero_from_row(s, current_row_idx);
+                        rows_gen_idx[current_row_idx] ++;
+                    }
                 }
 
-                if( rowidx < ones_lower_bound )
-                {
-                    tempw.push_back(snew);
-                }
-                else
-                {
-                    //check columns probably can be done better
-                    bool ok = true;
-                    for(int col = 0; col < n; col++)
-                        if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
-                            ok = false;
-                    if( ok )
-                        tempw.push_back(snew);
-                }
+                //make canonical form (sorted rows)
+                for(int r = std::max(current_row_idx + 1, 1); r < n - 1; r++)
+                    rows_gen_idx[r] = std::min(rows_gen_idx[r-1] + 1, possible_rows_size - 1);
+            }
+
+            if( rows_gen_idx[0] >= endidx ) //no more combinations left
+            {
+                all_generated = true;
+                break;
             }
         }
-        w = tempw;
-        printf("row idx:%d, size:%d\n", rowidx, (int)w.size());
-    }
 
-    std::vector<Sub> result;
-    for(int i = 0; i < (int)w.size(); i++)
-    {
-        bool ok = true;
-        for(int col = 0; col < n; col++)
-            if( ones_lower_bound > __builtin_popcountll(get_col(w[i], col)) )
-                ok = false;
-        if( ok )
-            result.push_back(w[i]);
-    }
+        if(all_generated) break;
 
-    printf("result size:%d\n", (int)result.size());
+        bool okay = true;
+        for(int col = 0; col < m; col++)
+            if( ones_lower_bound > __builtin_popcountll(get_col(s, col)) )
+                okay = false;
+        
+        if( okay && is_any_col_subset(s, false) )
+            okay = false;
+
+        if( canonical_columns && okay && is_inverted && !are_columns_sorted_inv(s) )
+            okay = false;
+
+        if( okay )
+        {
+            batch_progress++;
+            result -> push_back(invert_cols(invert_rows(s)));
+
+            /*for(int i = 0; i < N; i++)
+                printf("[%d: %d] ", i, rows_gen_idx[i]);
+            printf(" /%d\n", (int)possible_rows.size());*/
+            //printf("%llu:\n", s);
+            //print_subset(s);
+        }
+
+        //move to the next combination
+        rows_gen_idx[n-1] ++;
+
+        if( rows_gen_idx[n-1] >= possible_rows_size )
+        {
+            int last_r = n - 1;
+            for(int r = n - 1; r > 0; r--)
+            {
+                if( rows_gen_idx[r] < possible_rows_size )
+                {
+                    last_r = r + 1;
+                    break;
+                }
+                rows_gen_idx[r] = 0;
+                rows_gen_idx[r-1] ++;
+            }
+
+            for(int r = std::max(last_r, 1); r < n - 1; r++)
+                rows_gen_idx[r] = std::min(rows_gen_idx[r-1] + 1, possible_rows_size - 1);
+        }
+
+        if( rows_gen_idx[0] >= endidx )
+        {
+            all_generated = true;
+            break;
+        }
+    }
 
     return result;
 }
