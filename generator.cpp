@@ -48,7 +48,7 @@ void CasesGenerator::start_generator()
     rows_gen_idx[0] = startidx;
 
     for(Sub s = 0LL; s < (Sub)(1LL << (LLI)m); s++)
-        if( (ones_lower_bound <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= ones_upper_bound) )
+        if( (ones_lower_bound_row <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= ones_upper_bound_row) )
             possible_rows.push_back(s);
 
     endidx = std::min(endidx, (int)possible_rows.size());
@@ -268,10 +268,10 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
             if( is_any_row_subset(snew, current_row_idx) )
                 okay = false;
 
-            if( current_row_idx >= ones_upper_bound && okay )
+            if( current_row_idx >= ones_upper_bound_col && okay )
             {
                 for(int col = 0; col < m; col++)
-                    if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
+                    if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound_col )
                         okay = false;
             }
 
@@ -313,7 +313,7 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch(int b
 
         bool okay = true;
         for(int col = 0; col < m; col++)
-            if( ones_lower_bound > __builtin_popcountll(get_col(s, col)) )
+            if( ones_lower_bound_col > __builtin_popcountll(get_col(s, col)) )
                 okay = false;
         
         if( okay && is_any_col_subset(s, false) )
@@ -383,10 +383,10 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch_inver
             if( !are_columns_sorted_inv(s) )
                 okay = false;
 
-            if( current_row_idx >= ones_upper_bound && okay )
+            if( current_row_idx >= ones_upper_bound_col && okay )
             {
                 for(int col = 0; col < m; col++)
-                    if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound )
+                    if( __builtin_popcountll(get_col(snew, col)) > ones_upper_bound_col )
                         okay = false;
             }
 
@@ -428,7 +428,7 @@ std::unique_ptr<std::vector<Sub>> CasesGenerator::generate_with_ones_batch_inver
 
         bool okay = true;
         for(int col = 0; col < m; col++)
-            if( ones_lower_bound > __builtin_popcountll(get_col(s, col)) )
+            if( ones_lower_bound_col > __builtin_popcountll(get_col(s, col)) )
                 okay = false;
         
         if( okay && is_any_col_subset(s, false) )

@@ -617,11 +617,11 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
         /*printf("input: %llu:\n", val); print_subset(val);
         printf("output: %llu:\n", result.first); print_subset(result.first);
         printf("rowmoves: ");
-        for(int i = 0; i < result.second.first.size(); i++)
-            printf("%d ", result.second.first[i]);
+        for(int j = 0; j < result.second.first.size(); j++)
+            printf("%d ", result.second.first[j]);
         printf("\ncolmoves: ");
-        for(int i = 0; i < result.second.second.size(); i++)
-            printf("%d ", result.second.second[i]);
+        for(int j = 0; j < result.second.second.size(); j++)
+            printf("%d ", result.second.second[j]);
         printf("\n");
         printf("check:\n"); print_subset(check(result.first, result.second.first, result.second.second));*/
 
@@ -690,9 +690,9 @@ int main(int argc, char** argv)
     }
 
     bool is_inverted = true;
-    int howmanyones_lower, howmanyones_upper;
-    scanf("%d %d %d", &N, &howmanyones_lower, &howmanyones_upper);
-    M = N;
+    int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
+    scanf("%d %d %d %d %d %d", &N, &M, &howmanyones_lower_row, &howmanyones_upper_row, &howmanyones_lower_col, &howmanyones_upper_col);
+    //M = N;
 
     std::ofstream output_file, wrong_file;
     output_file.open(output_file_name);
@@ -717,13 +717,13 @@ int main(int argc, char** argv)
 
     int possible_rows_size = 0;
     for(Sub s = 0LL; s < (Sub)(1LL << (LLI)M); s++)
-        if( (howmanyones_lower <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= howmanyones_upper) )
+        if( (howmanyones_lower_row <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= howmanyones_upper_row) )
             possible_rows_size++;
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
     /*
-    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, is_inverted, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
     mygenerator.start_generator();
     while(!mygenerator.all_generated)
     {
@@ -738,27 +738,27 @@ int main(int argc, char** argv)
         
     }return 0;*/
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, false, 0, 1000);
-    mygenerator.start_generator();
-    int gensize = 0;
-    while(!mygenerator.all_generated)
-    {
-        gensize += mygenerator.generate_with_ones_batch(batch_size, true) -> size();
-        printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
-    }
-    printf("how many not inverted: %d\n", gensize); return 0;*/
-
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, false, 0, 1000);
     mygenerator.start_generator();
     LLI gensize = 0;
+    /*while(!mygenerator.all_generated)
+    {
+        gensize += mygenerator.generate_with_ones_batch(batch_size, true) -> size();
+        printf("%llu, progress:%lf\n", gensize, mygenerator.get_progress());
+    }
+    printf("how many not inverted: %llu\n", gensize);*/
+
+    /*mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    mygenerator.start_generator();
+    gensize = 0;
     while(!mygenerator.all_generated)
     {
         gensize += mygenerator.generate_with_ones_batch_inverted(batch_size, true) -> size();
         printf("%llu, progress:%lf\n", gensize, mygenerator.get_progress());
     }
-    printf("how many inverted: %d\n", gensize); return 0;*/
+    printf("how many inverted: %llu\n", gensize); return 0;*/
 
-    /*mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, false, 0, 1000);
+    /*mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, false, 0, 1000);
     mygenerator.start_generator();
     gensize = 0;
     while(!mygenerator.all_generated)
@@ -787,7 +787,7 @@ int main(int argc, char** argv)
         int s = i * my_rows_portion + start_position_rows;
         int e = (i == number_of_generating_threads - 1) ? end_position_rows : ((i + 1) * my_rows_portion - 1 + start_position_rows);
         printf("%d: %d, %d\n", i, s, e);
-        std::unique_ptr<CasesGenerator> g = std::make_unique<CasesGenerator>(N, M, howmanyones_lower, howmanyones_upper, is_inverted, s, e);
+        std::unique_ptr<CasesGenerator> g = std::make_unique<CasesGenerator>(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, s, e);
         g -> start_generator();
         generate_thread_pool -> AddWork(generate_batch, std::move(g));
     }
@@ -814,18 +814,21 @@ int main(int argc, char** argv)
                 std::cout << "[MAIN] generated batch " << count_generated << ", START: " << ((gen_res.second -> size() > 0) ? gen_res.second -> at(0) : 0 )   
                 << ", ID:" << gen_res.first -> startidx << " | progress estimation: " << gen_res.first -> get_progress() << "\n";
 
+                output_file << "[MAIN] generated batch " << count_generated << ", START: " << ((gen_res.second -> size() > 0) ? gen_res.second -> at(0) : 0 )   
+                << ", ID:" << gen_res.first -> startidx << " | progress estimation: " << gen_res.first -> get_progress() << "\n";
+
                 //gen_res.first -> print_rows_progress();
 
                 generator_progress[gen_res.first -> startidx] = gen_res.first -> get_progress();
 
-                std::cout << "generators progress: ";
+                /*std::cout << "generators progress: ";
                 double avg = 0.0;
                 for(auto it : generator_progress)
                 {
                     std::cout << it.second << ", ";
                     avg += it.second;
                 }
-                std::cout << "overall: " << avg / (double)number_of_generating_threads << "\n";
+                std::cout << "overall: " << avg / (double)number_of_generating_threads << "\n";*/
 
                 if( gen_res.second -> size() > 0 )
                 {

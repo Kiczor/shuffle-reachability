@@ -40,7 +40,7 @@ Sub check(Sub start, std::vector<int> row_move, std::vector<int> col_move)
         result |= move_row(start, rowidx, row_move[rowidx]);
     }
 
-    for(int colidx = 0; colidx < N; colidx++)
+    for(int colidx = 0; colidx < M; colidx++)
     {
         result |= move_col(start, colidx, col_move[colidx]);
     }

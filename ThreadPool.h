@@ -102,10 +102,12 @@ void ThreadPool<T_IN, T_OUT>::WorkLoop()
             work_queue.pop();            
         }
 
+        //printf("[POOL] %s\n", __PRETTY_FUNCTION__);
         //std::cout << "gave work to id=(" << std::this_thread::get_id() << ")\n";
 
         T_OUT current_result = work(std::move(argument));
 
+        //printf("got result of batch in %s\n", __PRETTY_FUNCTION__);
         //std::cout << "calculated result of batch:" << current_result.second << ", id=(" << std::this_thread::get_id() << ")\n";
         
         {
