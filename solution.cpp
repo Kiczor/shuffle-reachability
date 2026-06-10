@@ -646,6 +646,7 @@ int main(int argc, char** argv)
     int number_of_threads = 1;
     int number_of_generating_threads = 1;
     int start_position_rows = 0, end_position_rows = 10000;
+    LLI queue_item_limit = 10000000;
     std::string output_file_name = "result.out", wrong_file_name = "wrong.out";
 
     int optc;
@@ -745,15 +746,15 @@ int main(int argc, char** argv)
         gensize += mygenerator.generate_with_ones_batch(batch_size, true) -> size();
         printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
     }
-    printf("how many not inverted: %d\n", gensize); return 0;
+    printf("how many not inverted: %d\n", gensize); return 0;*/
 
-    mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, true, 0, 1000);
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower, howmanyones_upper, true, 0, 1000);
     mygenerator.start_generator();
-    gensize = 0;
+    LLI gensize = 0;
     while(!mygenerator.all_generated)
     {
         gensize += mygenerator.generate_with_ones_batch_inverted(batch_size, true) -> size();
-        printf("%d, progress:%lf\n", gensize, mygenerator.get_progress());
+        printf("%llu, progress:%lf\n", gensize, mygenerator.get_progress());
     }
     printf("how many inverted: %d\n", gensize); return 0;*/
 
@@ -853,9 +854,13 @@ int main(int argc, char** argv)
 
 
         // --------- gathering results -----------
-        while(solve_thread_pool -> ResultsLeftToCollect())
+        while(solve_thread_pool -> ResultsLeftToCollect() || (LLI)batch_size * (LLI)(solve_thread_pool -> GetWorkQueueSize()) > queue_item_limit)
         {
+            if( (LLI)batch_size * (LLI)(solve_thread_pool -> GetWorkQueueSize()) > queue_item_limit )
+                std::cout << "[MAIN] solving work queue at capacity limit, waiting for result to collect\n";
+
             std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
+            solve_thread_pool->some_work_ended.wait(lock, [&]{ return (solve_thread_pool -> result_queue.size()) > 0; });
 
             std::pair<Sub, std::vector<Sub>> result = (solve_thread_pool -> result_queue).front();
             (solve_thread_pool -> result_queue).pop();
@@ -952,6 +957,8 @@ int main(int argc, char** argv)
             print_subset(wrong[i]);
         }
     }
+
+    output_file << "finished\n";
 
     output_file.close();
     wrong_file.close();

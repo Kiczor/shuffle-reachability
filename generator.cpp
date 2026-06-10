@@ -73,7 +73,7 @@ double CasesGenerator::get_progress()
 {
     if( all_generated )
         return 100.0;
-    long long int progress = 0, multiply = 1, all = 0;
+    unsigned long long int progress = 0, multiply = 1, all = 0;
     for(int i = N - 1; i > 0; i--)
     {
         progress += multiply * (LLI)rows_gen_idx[i];
@@ -82,6 +82,8 @@ double CasesGenerator::get_progress()
     }
     progress += multiply * (rows_gen_idx[0] - startidx);
     all += multiply * (endidx - startidx);
+
+    print_rows_progress();
 
     return 100.0 * ((double)progress / (double)all);
     //return (100.0 * (double)(rows_gen_idx[0] - startidx)) / (double)(endidx - startidx);
