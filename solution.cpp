@@ -82,7 +82,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
     int badcases1 = 0, badcases2 = 0, badcases3 = 0, badcasesvalid = 0;
 
     //data declaration:
-    const int maxN = 8, maxM = 8;
+    constexpr int maxN = 8, maxM = 8;
     std::vector<int> rows_on_row[maxN+1];  //which rows are put on i-th row
     std::vector<int> rows_alone;    //which rows dont have any row put on them
     std::vector<int> rows_set_on_itself; //which rows are set on itself in move
@@ -543,7 +543,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             printf("\n");
         }
 
-        if( __builtin_popcountll(result) >= __builtin_popcountll(to) ) 
+        if( std::popcount(result) >= std::popcount(to) ) 
         {
             badcases3++;
             continue;
@@ -573,7 +573,7 @@ std::pair<bool, int> cycle_backwards(Sub start)
 {
     Sub s = start;
     int steps = 0;
-    while( __builtin_popcountll(s) > 2 )
+    while( std::popcount(s) > 2 )
     {
         auto res = backwardgood(s, 0);
 
@@ -610,7 +610,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
         auto result = backwardgood(val, false);
         if(result.first == 0)
         {
-            printf("(%llu)result is zero\n", val);
+            std::cout << val << " - result is zero\n";
             input_wrong.push_back(val);
         }
 
@@ -691,7 +691,7 @@ int main(int argc, char** argv)
 
     bool is_inverted = true;
     int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
-    scanf("%d %d %d %d %d %d", &N, &M, &howmanyones_lower_row, &howmanyones_upper_row, &howmanyones_lower_col, &howmanyones_upper_col);
+    std::cin >> N >> M >> howmanyones_lower_row >> howmanyones_upper_row >> howmanyones_lower_col >> howmanyones_upper_col;
     //M = N;
 
     std::ofstream output_file, wrong_file;
@@ -717,10 +717,16 @@ int main(int argc, char** argv)
 
     int possible_rows_size = 0;
     for(Sub s = 0LL; s < (Sub)(1LL << (LLI)M); s++)
-        if( (howmanyones_lower_row <= __builtin_popcountll(s)) && (__builtin_popcountll(s) <= howmanyones_upper_row) )
+        if( (howmanyones_lower_row <= std::popcount(s)) && (std::popcount(s) <= howmanyones_upper_row) )
             possible_rows_size++;
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
+
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    mygenerator.start_generator();
+    std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
+    auto result = processbatch(std::move(v));
+    return 0;*/
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
@@ -738,15 +744,15 @@ int main(int argc, char** argv)
         
     }return 0;*/
 
-    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, false, 0, 1000);
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, false, 0, 1000);
     mygenerator.start_generator();
     LLI gensize = 0;
-    /*while(!mygenerator.all_generated)
+    while(!mygenerator.all_generated)
     {
         gensize += mygenerator.generate_with_ones_batch(batch_size, true) -> size();
         printf("%llu, progress:%lf\n", gensize, mygenerator.get_progress());
     }
-    printf("how many not inverted: %llu\n", gensize);*/
+    printf("how many not inverted: %llu\n", gensize); return 0;*/
 
     /*mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
@@ -768,7 +774,7 @@ int main(int argc, char** argv)
     }
     printf("how many columns not canon: %d\n", gensize); return 0;*/
 
-    std::map<Sub, bool> calculated;
+    std::unordered_map<Sub, bool> calculated;
     int count_generated = 0, count_collected = 0;
 
     std::vector<Sub> wrong;
@@ -794,7 +800,7 @@ int main(int argc, char** argv)
 
     printf("begin while\n");
 
-    std::map<LLI, double> generator_progress;
+    std::unordered_map<LLI, double> generator_progress;
 
     int generators_finished = 0;
     while( generators_finished < number_of_generating_threads )
