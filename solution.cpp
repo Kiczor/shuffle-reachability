@@ -64,36 +64,79 @@ std::vector< std::vector<int> > generate_moves(int dim)
 //comparator for sorting satisfiedby
 struct comparatorSatisfied
 {
-    bool operator()(const std::pair<std::pair<int, int>, std::vector<int> > & a, const std::pair<std::pair<int, int>, std::vector<int> > & b)
+    bool operator()(const std::pair<std::pair<int, int>, unsigned int > & a, const std::pair<std::pair<int, int>, unsigned int > & b)
     {
-        int asize = a.second.size(), bsize = b.second.size();
-        if( asize == bsize )
+        int acnt = std::popcount(a.second), bcnt = std::popcount(b.second);
+        if( acnt == bcnt )
         {
             if( a.first.first == b.first.first )
                 return a.first.second < b.first.second;
             return a.first.first < b.first.first;
         }
-        return asize < bsize;
+        return acnt < bcnt;
     }
 };
 
-std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, bool debug)
+constexpr int maxN = 8, maxM = 8;
+struct BackwardData
 {
-    int badcases1 = 0, badcases2 = 0, badcases3 = 0, badcasesvalid = 0;
-
-    //data declaration:
-    constexpr int maxN = 8, maxM = 8;
     std::vector<int> rows_on_row[maxN+1];  //which rows are put on i-th row
     std::vector<int> rows_alone;    //which rows dont have any row put on them
     std::vector<int> rows_set_on_itself; //which rows are set on itself in move
     std::vector<std::pair<int, int> > to_satisfy;
     std::vector<int> can_be_put_here[maxM+1]; //which columns CAN be put on i-th column
     std::vector<int> where_can_be_put[maxM+1]; //for a column when it can be put
-    std::vector<std::pair<std::pair<int, int>, std::vector<int> > > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
+    std::vector<std::pair<std::pair<int, int>, unsigned int > > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
     std::vector<int> groups;
 
+    void ReserveSpace()
+    {
+        rows_alone.reserve(8);
+        rows_set_on_itself.reserve(8);
+        to_satisfy.reserve(64);
+        satisfied_by.reserve(64);
+        groups.reserve(8);
+
+        for(int i = 0; i < N; i++)
+            rows_on_row[i].reserve(8);
+
+        for(int i = 0; i < M; i++)
+        {
+            can_be_put_here[i].reserve(8);
+            where_can_be_put[i].reserve(8);
+            column_destination[i] = -1;
+            group_mask[i] = 0ULL;
+        }
+    }
+
+    void ZeroData()
+    {
+        rows_alone.clear();
+        rows_set_on_itself.clear();
+        to_satisfy.clear();
+        satisfied_by.clear();
+        groups.clear();
+
+        for(int i = 0; i < N; i++)
+            rows_on_row[i].clear();
+
+        for(int i = 0; i < M; i++)
+        {
+            can_be_put_here[i].clear();
+            where_can_be_put[i].clear();
+            column_destination[i] = -1;
+            group_mask[i] = 0ULL;
+        }
+    }
+};
+
+std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, BackwardData &data, bool debug)
+{
+    int badcases1 = 0, badcases2 = 0, badcases3 = 0, badcasesvalid = 0;
+
+    //data declaration:
     Sub _all_ones_mask = ~(0ULL); //2^64 - 1 
 
     Sub can_be_one; //equivalent to ?/(-1)
@@ -102,21 +145,6 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
     Sub already_satisfied; //if certain 1 on alone row is satisfied
     Sub group_to_satisfy;
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
-
-    rows_alone.reserve(8);
-    rows_set_on_itself.reserve(8);
-    to_satisfy.reserve(64);
-    satisfied_by.reserve(64);
-    groups.reserve(8);
-
-    for(int i = 0; i < N; i++)
-        rows_on_row[i].reserve(8);
-
-    for(int i = 0; i < M; i++)
-    {
-        can_be_put_here[i].reserve(8);
-        where_can_be_put[i].reserve(8);
-    }
     //end data
 
     for(int row_moveit = 0; row_moveit < (int)rowmoves.size(); row_moveit++)
@@ -124,23 +152,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         std::vector<int> row_move = rowmoves[row_moveit]; //current move
 
         //zero data
-        rows_alone.resize(0);
-        rows_set_on_itself.resize(0);
-        to_satisfy.resize(0);
-        satisfied_by.resize(0);
-        groups.resize(0);
-
-        for(int i = 0; i < N; i++)
-            rows_on_row[i].resize(0);
-
-        for(int i = 0; i < M; i++)
-        {
-            can_be_put_here[i].resize(0);
-            where_can_be_put[i].resize(0);
-            column_destination[i] = -1;
-            group_mask[i] = 0ULL;
-        }
-
+        data.ZeroData();
+        
         can_be_one = _all_ones_mask; //all ones
         goal = 0ULL;
         result = 0ULL;
@@ -155,24 +168,24 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
         for(int i = 0; i < N; i++)
         {
-            rows_on_row[row_move[i]].push_back(i);
+            data.rows_on_row[row_move[i]].push_back(i);
             if( row_move[i] == i )
-                rows_set_on_itself.push_back(i);
+                data.rows_set_on_itself.push_back(i);
         }
         for(int i = 0; i < N; i++)  
-            if(rows_on_row[i].size() == 0)
+            if(data.rows_on_row[i].size() == 0)
             {
-                rows_alone.push_back(i);
+                data.rows_alone.push_back(i);
                 rows_alone_mask |= set_row_as(firstrowmask, i);
             }
 
-        for(int aloneidx = 0; aloneidx < (int)rows_alone.size(); aloneidx++)
+        for(int aloneidx = 0; aloneidx < (int)data.rows_alone.size(); aloneidx++)
         {
-            int row_alone_idx = rows_alone[aloneidx];
+            int row_alone_idx = data.rows_alone[aloneidx];
             for(int j = 0; j < M; j++)
             {
                 if( get_one_value(goal, row_alone_idx, j) )
-                    to_satisfy.push_back(std::make_pair(row_alone_idx, j));
+                    data.to_satisfy.push_back(std::make_pair(row_alone_idx, j));
             }
         }
 
@@ -198,7 +211,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             print_subset(can_be_one);
 
             printf("to satisfy: ");
-            for(int i = 0; i < (int)to_satisfy.size(); i++) printf("(%d, %d) ", to_satisfy[i].first, to_satisfy[i].second);
+            for(int i = 0; i < (int)data.to_satisfy.size(); i++) printf("(%d, %d) ", data.to_satisfy[i].first, data.to_satisfy[i].second);
             printf("\n");
         }
 
@@ -211,16 +224,16 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
         for(int i = 0; i < N; i++)
         {
-            group_mask[i] = 0ULL;
-            if( rows_on_row[i].empty() ) continue;
+            data.group_mask[i] = 0ULL;
+            if( data.rows_on_row[i].empty() ) continue;
 
-            groups.push_back(i);
+            data.groups.push_back(i);
             group_to_satisfy |= set_row_as(firstrowmask, i) & goal;
-            for(int ir = 0; ir < (int)rows_on_row[i].size(); ir++)
+            for(int ir = 0; ir < (int)data.rows_on_row[i].size(); ir++)
             {
-                int rowidx = rows_on_row[i][ir];
+                int rowidx = data.rows_on_row[i][ir];
                 
-                group_mask[i] |= set_row_as(firstrowmask, rowidx);
+                data.group_mask[i] |= set_row_as(firstrowmask, rowidx);
             }
         }
 
@@ -250,11 +263,11 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 //printf("%d->%d\n", colidx, destcolidx);
 
                 bool allokay = true;
-                for(int group_idx = 0; group_idx < (int)groups.size(); group_idx++)
+                for(int group_idx = 0; group_idx < (int)data.groups.size(); group_idx++)
                 {
-                    int group = groups[group_idx];
-                    Sub col_group = get_col(can_be_one, colidx) & group_mask[group];
-                    Sub dest_col_group = get_col(goal, destcolidx) & group_mask[group];
+                    int group = data.groups[group_idx];
+                    Sub col_group = get_col(can_be_one, colidx) & data.group_mask[group];
+                    Sub dest_col_group = get_col(goal, destcolidx) & data.group_mask[group];
 
                     //printf("group: %d\n", group);
                     //printf("col group:\n"); print_subset(col_group);
@@ -266,8 +279,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
                 if( allokay )
                 {
-                    can_be_put_here[destcolidx].push_back(colidx);
-                    where_can_be_put[colidx].push_back(destcolidx);
+                    data.can_be_put_here[destcolidx].push_back(colidx);
+                    data.where_can_be_put[colidx].push_back(destcolidx);
                 }
             }
         }
@@ -277,9 +290,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             printf("group mask\n");
             for(int i = 0; i < N; i++)
             {
-                if( group_mask[i] == 0ULL ) continue;
+                if( data.group_mask[i] == 0ULL ) continue;
                 printf("%d: \n", i);
-                print_subset(group_mask[i]);
+                print_subset(data.group_mask[i]);
             }
 
             printf("group to satisfy:\n");
@@ -289,8 +302,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             for(int i = 0; i < M; i++) 
             {
                 printf("%d: ", i);
-                for(int j = 0; j < (int)can_be_put_here[i].size(); j++)
-                    printf("%d ", can_be_put_here[i][j]);
+                for(int j = 0; j < (int)data.can_be_put_here[i].size(); j++)
+                    printf("%d ", data.can_be_put_here[i][j]);
                 printf("\n");
             }
             printf("\n");
@@ -299,8 +312,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             for(int i = 0; i < M; i++) 
             {
                 printf("%d: ", i);
-                for(int j = 0; j < (int)where_can_be_put[i].size(); j++)
-                    printf("%d ", where_can_be_put[i][j]);
+                for(int j = 0; j < (int)data.where_can_be_put[i].size(); j++)
+                    printf("%d ", data.where_can_be_put[i][j]);
                 printf("\n");
             }
             printf("\n");
@@ -308,7 +321,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
         bool allhavedestination = true;
         for(int i = 0; i < M; i++)
-            if( (int)where_can_be_put[i].size() == 0 )
+            if( (int)data.where_can_be_put[i].size() == 0 )
                 allhavedestination = false;
 
         // some columns cannot be put on any column
@@ -319,52 +332,55 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             continue;
         }
 
-        for(int satidx = 0; satidx < (int)to_satisfy.size(); satidx++)
+        for(int satidx = 0; satidx < (int)data.to_satisfy.size(); satidx++)
         {
-            std::pair<int, int> position = to_satisfy[satidx];
-            std::vector<int> possibilities;
-            for(int i = 0; i < (int)can_be_put_here[position.second].size(); i++)
+            std::pair<int, int> position = data.to_satisfy[satidx];
+            unsigned int possibilities = 0;
+            for(int i = 0; i < (int)data.can_be_put_here[position.second].size(); i++)
             {
-                int colidx = can_be_put_here[position.second][i];
+                int colidx = data.can_be_put_here[position.second][i];
                 if( get_one_value(can_be_one, position.first, colidx) )
                 {
-                    possibilities.push_back(colidx);
-                    //all_satisfied_for[colidx][position.second].push_back(position);
+                    possibilities |= 1 << colidx;
                 }
             }
 
-            satisfied_by.push_back(make_pair(position, possibilities));
+            data.satisfied_by.push_back(make_pair(position, possibilities));
         }
 
         //maybe priority queue?
-        sort(satisfied_by.begin(), satisfied_by.end(), comparatorSatisfied());
+        sort(data.satisfied_by.begin(), data.satisfied_by.end(), comparatorSatisfied());
 
         if( debug )
         {
             printf("satisfied by:\n");
-            for(int i = 0; i < (int)satisfied_by.size(); i++)
+            for(int i = 0; i < (int)data.satisfied_by.size(); i++)
             {
-                printf("(%d, %d): ", satisfied_by[i].first.first, satisfied_by[i].first.second);
-                for(int j = 0; j < (int)satisfied_by[i].second.size(); j++)
-                    printf("%d ", satisfied_by[i].second[j]);
+                printf("(%d, %d): ", data.satisfied_by[i].first.first, data.satisfied_by[i].first.second);
+                for(int j = 0; j < M; j++)
+                    if( ((1 << j) & data.satisfied_by[i].second) != 0 )
+                        printf("%d ", j);
                 printf("\n");
             }
         }
 
         bool everyone_satisfied = true;
-        for(int satidx = 0; satidx < (int)satisfied_by.size(); satidx++)
+        for(int satidx = 0; satidx < (int)data.satisfied_by.size(); satidx++)
         {
-            std::pair<int, int> position = satisfied_by[satidx].first;
+            std::pair<int, int> position = data.satisfied_by[satidx].first;
 
             //nothing to do
             if( get_one_value(already_satisfied, position.first, position.second) ) continue;
 
-            for(int satcolidx = 0; satcolidx < (int)satisfied_by[satidx].second.size(); satcolidx++)
+            //for(int satcolidx = 0; satcolidx < (int)data.satisfied_by[satidx].second.size(); satcolidx++)
+            unsigned int satisfied_by_mask = data.satisfied_by[satidx].second;
+            for(int col = 0; col < M; col++)
             {
-                int col = satisfied_by[satidx].second[satcolidx];
-                if( column_destination[col] == -1 )
+                if( ((1 << col) & satisfied_by_mask) == 0 ) continue;
+
+                if( data.column_destination[col] == -1 )
                 {
-                    column_destination[col] = position.second;
+                    data.column_destination[col] = position.second;
 
                     Sub not_yet_satisfied = ~already_satisfied;
                     already_satisfied |= move_col( can_be_one, col, position.second ) & rows_alone_mask & goal;
@@ -382,14 +398,14 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                     //setting 1 on alone rows satisfied (only ones that have destination currently)
                     result |= get_col( can_be_one, col )
                      & rows_alone_mask
-                     & move_col(goal, column_destination[col], col) 
-                     & move_col(not_yet_satisfied, column_destination[col], col);
+                     & move_col(goal, data.column_destination[col], col) 
+                     & move_col(not_yet_satisfied, data.column_destination[col], col);
                     
                     //updating group satisfied
-                    for(int group_it = 0; group_it < (int)groups.size(); group_it++)
+                    for(int group_it = 0; group_it < (int)data.groups.size(); group_it++)
                     {
-                        int grouprow = groups[group_it];
-                        if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & group_mask[grouprow]) != 0ULL ) )
+                        int grouprow = data.groups[group_it];
+                        if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & data.group_mask[grouprow]) != 0ULL ) )
                             group_satisfied |= set_one_value(group_satisfied, grouprow, col);
                     }
                     
@@ -425,30 +441,30 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 printf("%d ", row_move[i]);
             printf("\ncols: ");
             for(int i = 0; i < M; i++)
-                printf("%d ", column_destination[i]);
+                printf("%d ", data.column_destination[i]);
             printf("\n");
         }
 
         //not optimal but maybe faster than sorting
-        for(int onitselfidx = 0; onitselfidx < (int)rows_set_on_itself.size(); onitselfidx++)
+        for(int onitselfidx = 0; onitselfidx < (int)data.rows_set_on_itself.size(); onitselfidx++)
         {
-            int rowidx = rows_set_on_itself[onitselfidx];
+            int rowidx = data.rows_set_on_itself[onitselfidx];
 
             for(int col = 0; col < M; col++)
             {
-                if( column_destination[col] != -1 ) continue;
+                if( data.column_destination[col] != -1 ) continue;
 
                 //group on col not yet satisfied
                 if( get_one_value( group_to_satisfy, rowidx, col ) && (get_one_value( group_satisfied, rowidx, col ) == 0) )
                 {
-                    for(int whereidx = 0; whereidx < (int)where_can_be_put[col].size(); whereidx++)
+                    for(int whereidx = 0; whereidx < (int)data.where_can_be_put[col].size(); whereidx++)
                     {
-                        int candidate_col = where_can_be_put[col][whereidx];
+                        int candidate_col = data.where_can_be_put[col][whereidx];
                         if( col == candidate_col ) continue;
 
                         if( get_one_value( group_to_satisfy, rowidx, candidate_col ) && (get_one_value( group_satisfied, rowidx, candidate_col ) == 0) )
                         {
-                            column_destination[col] = candidate_col;
+                            data.column_destination[col] = candidate_col;
                             result |= set_one_value( result, rowidx, col );
                             group_satisfied |= set_one_value( group_satisfied, rowidx, col ) | set_one_value( group_satisfied, rowidx, candidate_col );
                             break;
@@ -472,31 +488,31 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 printf("%d ", row_move[i]);
             printf("\ncols: ");
             for(int i = 0; i < M; i++)
-                printf("%d ", column_destination[i]);
+                printf("%d ", data.column_destination[i]);
             printf("\n");;
         }
         
         //rest of the columns are put on any possible column
         for(int col = 0; col < M; col++)
         {
-            if( column_destination[col] == -1 )
-                column_destination[col] = where_can_be_put[col][0];
+            if( data.column_destination[col] == -1 )
+                data.column_destination[col] = data.where_can_be_put[col][0];
         }
 
         //setting result on columns set before (correcting groups)
         for(int col = 0; col < M; col++)
         {
-            if( column_destination[col] == -1 ) continue;
-            for(int i = 0; i < (int)groups.size(); i++)
+            if( data.column_destination[col] == -1 ) continue;
+            for(int i = 0; i < (int)data.groups.size(); i++)
             {
-                int grouprow = groups[i];
-                Sub group_rows_mask = group_mask[grouprow];
+                int grouprow = data.groups[i];
+                Sub group_rows_mask = data.group_mask[grouprow];
                 if( (get_one_value( group_to_satisfy, grouprow, col ) == 1) && (get_one_value( group_satisfied, grouprow, col ) == 0) )
                 {
                     //only if there is no ones satisfying group yet
                     if( (group_rows_mask & get_col(result, col)) == 0ULL )
                     {
-                        Sub col_ones = group_rows_mask & get_col(can_be_one, col) & move_col(goal, column_destination[col], col);
+                        Sub col_ones = group_rows_mask & get_col(can_be_one, col) & move_col(goal, data.column_destination[col], col);
 
                         /*printf("group rows mask:\n");
                         print_subset(group_rows_mask);
@@ -539,7 +555,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 printf("%d ", row_move[i]);
             printf("\ncols: ");
             for(int i = 0; i < M; i++)
-                printf("%d ", column_destination[i]);
+                printf("%d ", data.column_destination[i]);
             printf("\n");
         }
 
@@ -558,8 +574,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
         //result was found
         std::vector<int> result_col_moves;
+        result_col_moves.reserve(8);
         for(int j = 0; j < M; j++)
-            result_col_moves.push_back(column_destination[j]);
+            result_col_moves.push_back(data.column_destination[j]);
 
         //printf("\nbad cases: %d / %d / %d / not valid:%d / %d\n", badcases1, badcases2, badcases3, badcasesvalid, (int)rowmoves.size());
         return std::make_pair(result, std::make_pair(row_move, result_col_moves));
@@ -571,11 +588,14 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
 std::pair<bool, int> cycle_backwards(Sub start)
 {
+    BackwardData data;
+    data.ReserveSpace();
+
     Sub s = start;
     int steps = 0;
     while( std::popcount(s) > 2 )
     {
-        auto res = backwardgood(s, 0);
+        auto res = backwardgood(s, data, false);
 
         Sub checkresult = check(res.first, res.second.first, res.second.second);
 
@@ -598,6 +618,9 @@ int batch_size = 10000;
 
 std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> batch)
 {
+    BackwardData data;
+    data.ReserveSpace();
+
     std::vector<Sub> input_wrong; 
 
     if( batch -> size() == 0 )
@@ -607,7 +630,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
     for(int i = 0; i < (int)(batch -> size()); i++)
     {
         Sub val = batch -> at(i);
-        auto result = backwardgood(val, false);
+        auto result = backwardgood(val, data, false);
         if(result.first == 0)
         {
             std::cout << val << " - result is zero\n";
@@ -722,11 +745,11 @@ int main(int argc, char** argv)
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
-    return 0;*/
+    return 0;
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
