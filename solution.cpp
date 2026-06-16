@@ -82,9 +82,6 @@ constexpr int maxN = 8, maxM = 8;
 struct BackwardData
 {
     boost::container::static_vector<int, maxN> rows_on_row[maxN+1];  //which rows are put on i-th row
-    boost::container::static_vector<int, maxN> rows_alone;    //which rows dont have any row put on them
-    boost::container::static_vector<int, maxN> rows_set_on_itself; //which rows are set on itself in move
-    boost::container::static_vector<std::pair<int, int>, maxN * maxM> to_satisfy;
     boost::container::static_vector<int, maxM> can_be_put_here[maxM+1]; //which columns CAN be put on i-th column
     boost::container::static_vector<int, maxM> where_can_be_put[maxM+1]; //for a column where it can be put
     boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
@@ -94,9 +91,6 @@ struct BackwardData
 
     inline void ReserveSpace()
     {
-        rows_alone.reserve(8);
-        rows_set_on_itself.reserve(8);
-        to_satisfy.reserve(64);
         satisfied_by.reserve(64);
         groups.reserve(8);
 
@@ -116,9 +110,6 @@ struct BackwardData
 
     inline void ZeroData()
     {
-        rows_alone.clear();
-        rows_set_on_itself.clear();
-        to_satisfy.clear();
         satisfied_by.clear();
         groups.clear();
 
@@ -148,6 +139,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
     Sub rows_alone_mask;
     Sub goal, result;
     Sub already_satisfied; //if certain 1 on alone row is satisfied
+    Sub to_satisfy;
     Sub group_to_satisfy;
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
     //end data
@@ -164,6 +156,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         result = 0ULL;
         already_satisfied = 0ULL;
         rows_alone_mask = 0ULL;
+        to_satisfy = 0ULL;
         group_satisfied = 0ULL;
         group_to_satisfy = 0ULL;
         //end zero data
@@ -174,26 +167,17 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         for(int i = 0; i < N; i++)
         {
             data.rows_on_row[row_move[i]].push_back(i);
-            if( row_move[i] == i )
-                data.rows_set_on_itself.push_back(i);
         }
-        for(int i = 0; i < N; i++)  
-            if(data.rows_on_row[i].size() == 0)
+        for(int row_alone_idx = 0; row_alone_idx < N; row_alone_idx++)  
+            if(data.rows_on_row[row_alone_idx].size() == 0)
             {
-                data.rows_alone.push_back(i);
-                rows_alone_mask |= set_row_as(firstrowmask, i);
+                rows_alone_mask |= set_row_as(firstrowmask, row_alone_idx);
+                for(int j = 0; j < M; j++)
+                {
+                    if( get_one_value(goal, row_alone_idx, j) )
+                        to_satisfy |= set_one_value(to_satisfy, row_alone_idx, j);
+                }
             }
-
-        for(int aloneidx = 0; aloneidx < (int)data.rows_alone.size(); aloneidx++)
-        {
-            int row_alone_idx = data.rows_alone[aloneidx];
-            for(int j = 0; j < M; j++)
-            {
-                if( get_one_value(goal, row_alone_idx, j) )
-                    data.to_satisfy.push_back(std::make_pair(row_alone_idx, j));
-            }
-        }
-
 
         for(int rowidx = 0; rowidx < N; rowidx++)
         {
@@ -216,7 +200,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             print_subset(can_be_one);
 
             printf("to satisfy: ");
-            for(int i = 0; i < (int)data.to_satisfy.size(); i++) printf("(%d, %d) ", data.to_satisfy[i].first, data.to_satisfy[i].second);
+            print_subset(to_satisfy);
             printf("\n");
         }
 
@@ -337,20 +321,25 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             continue;
         }
 
-        for(int satidx = 0; satidx < (int)data.to_satisfy.size(); satidx++)
+        for(int row = 0; row < N; row++)
         {
-            std::pair<int, int> position = data.to_satisfy[satidx];
-            unsigned int possibilities = 0;
-            for(int i = 0; i < (int)data.can_be_put_here[position.second].size(); i++)
+            for(int col = 0; col < M; col++)
             {
-                int colidx = data.can_be_put_here[position.second][i];
-                if( get_one_value(can_be_one, position.first, colidx) )
+                if(get_one_value(to_satisfy, row, col))   
                 {
-                    possibilities |= 1 << colidx;
+                    unsigned int possibilities = 0;
+                    for(int i = 0; i < (int)data.can_be_put_here[col].size(); i++)
+                    {
+                        int colidx = data.can_be_put_here[col][i];
+                        if( get_one_value(can_be_one, row, colidx) )
+                        {
+                            possibilities |= 1 << colidx;
+                        }
+                    }
+
+                    data.satisfied_by.push_back(std::make_pair(std::make_pair(row, col), possibilities));
                 }
             }
-
-            data.satisfied_by.push_back(make_pair(position, possibilities));
         }
 
         //maybe priority queue?
@@ -451,28 +440,30 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         }
 
         //not optimal but maybe faster than sorting
-        for(int onitselfidx = 0; onitselfidx < (int)data.rows_set_on_itself.size(); onitselfidx++)
+        for(int rowidx = 0; rowidx < N; rowidx++)
         {
-            int rowidx = data.rows_set_on_itself[onitselfidx];
-
-            for(int col = 0; col < M; col++)
+            //if row is set on itself
+            if( row_move[rowidx] == rowidx )
             {
-                if( data.column_destination[col] != -1 ) continue;
-
-                //group on col not yet satisfied
-                if( get_one_value( group_to_satisfy, rowidx, col ) && (get_one_value( group_satisfied, rowidx, col ) == 0) )
+                for(int col = 0; col < M; col++)
                 {
-                    for(int whereidx = 0; whereidx < (int)data.where_can_be_put[col].size(); whereidx++)
-                    {
-                        int candidate_col = data.where_can_be_put[col][whereidx];
-                        if( col == candidate_col ) continue;
+                    if( data.column_destination[col] != -1 ) continue;
 
-                        if( get_one_value( group_to_satisfy, rowidx, candidate_col ) && (get_one_value( group_satisfied, rowidx, candidate_col ) == 0) )
+                    //group on col not yet satisfied
+                    if( get_one_value( group_to_satisfy, rowidx, col ) && (get_one_value( group_satisfied, rowidx, col ) == 0) )
+                    {
+                        for(int whereidx = 0; whereidx < (int)data.where_can_be_put[col].size(); whereidx++)
                         {
-                            data.column_destination[col] = candidate_col;
-                            result |= set_one_value( result, rowidx, col );
-                            group_satisfied |= set_one_value( group_satisfied, rowidx, col ) | set_one_value( group_satisfied, rowidx, candidate_col );
-                            break;
+                            int candidate_col = data.where_can_be_put[col][whereidx];
+                            if( col == candidate_col ) continue;
+
+                            if( get_one_value( group_to_satisfy, rowidx, candidate_col ) && (get_one_value( group_satisfied, rowidx, candidate_col ) == 0) )
+                            {
+                                data.column_destination[col] = candidate_col;
+                                result |= set_one_value( result, rowidx, col );
+                                group_satisfied |= set_one_value( group_satisfied, rowidx, col ) | set_one_value( group_satisfied, rowidx, candidate_col );
+                                break;
+                            }
                         }
                     }
                 }
