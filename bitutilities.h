@@ -72,5 +72,5 @@ inline Sub set_one_value(Sub s, int idxrow, int idxcol)
 
 inline bool get_one_value(Sub s, int idxrow, int idxcol)
 {
-    return (s & set_one_value(0ULL, idxrow, idxcol)) != 0ULL;
+    return (s >> (LLI)(M * idxrow + idxcol)) & 1ULL;
 }

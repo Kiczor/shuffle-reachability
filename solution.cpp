@@ -82,8 +82,6 @@ constexpr int maxN = 8, maxM = 8;
 struct BackwardData
 {
     boost::container::static_vector<int, maxN> rows_on_row[maxN+1];  //which rows are put on i-th row
-    boost::container::static_vector<int, maxM> can_be_put_here[maxM+1]; //which columns CAN be put on i-th column
-    boost::container::static_vector<int, maxM> where_can_be_put[maxM+1]; //for a column where it can be put
     boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
@@ -102,8 +100,6 @@ struct BackwardData
 
         for(int i = 0; i < M; i++)
         {
-            can_be_put_here[i].reserve(8);
-            where_can_be_put[i].reserve(8);
             column_destination[i] = -1;
         }
     }
@@ -121,8 +117,6 @@ struct BackwardData
 
         for(int i = 0; i < M; i++)
         {
-            can_be_put_here[i].clear();
-            where_can_be_put[i].clear();
             column_destination[i] = -1;
         }
     }
@@ -139,6 +133,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
     Sub rows_alone_mask;
     Sub goal, result;
     Sub already_satisfied; //if certain 1 on alone row is satisfied
+    Sub can_be_put_here; //which columns CAN be put on i-th column - get_one_value(can_be_put_here, i, j) != 0 means that column j can be put on column i
+    Sub where_can_be_put; //for a column where it can be put - get_one_value(where_can_be_put, i, j) != 0 means that column i can be put on column j
     Sub to_satisfy;
     Sub group_to_satisfy;
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
@@ -156,6 +152,8 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         result = 0ULL;
         already_satisfied = 0ULL;
         rows_alone_mask = 0ULL;
+        can_be_put_here = 0ULL;
+        where_can_be_put = 0ULL;
         to_satisfy = 0ULL;
         group_satisfied = 0ULL;
         group_to_satisfy = 0ULL;
@@ -268,8 +266,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
                 if( allokay )
                 {
-                    data.can_be_put_here[destcolidx].push_back(colidx);
-                    data.where_can_be_put[colidx].push_back(destcolidx);
+                    //data.where_can_be_put[colidx].push_back(destcolidx);
+                    can_be_put_here |= set_one_value(can_be_put_here, destcolidx, colidx);
+                    where_can_be_put |= set_one_value(where_can_be_put, colidx, destcolidx);
                 }
             }
         }
@@ -291,8 +290,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             for(int i = 0; i < M; i++) 
             {
                 printf("%d: ", i);
-                for(int j = 0; j < (int)data.can_be_put_here[i].size(); j++)
-                    printf("%d ", data.can_be_put_here[i][j]);
+                for(int j = 0; j < M; j++)
+                    if( get_one_value(can_be_put_here, i, j) )
+                        printf("%d ", j);
                 printf("\n");
             }
             printf("\n");
@@ -301,8 +301,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             for(int i = 0; i < M; i++) 
             {
                 printf("%d: ", i);
-                for(int j = 0; j < (int)data.where_can_be_put[i].size(); j++)
-                    printf("%d ", data.where_can_be_put[i][j]);
+                for(int j = 0; j < M; j++)
+                    if( get_one_value(where_can_be_put, i, j) )
+                        printf("%d ", j);
                 printf("\n");
             }
             printf("\n");
@@ -310,7 +311,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
 
         bool allhavedestination = true;
         for(int i = 0; i < M; i++)
-            if( (int)data.where_can_be_put[i].size() == 0 )
+            if( std::popcount( get_row(where_can_be_put, i) ) == 0 )
                 allhavedestination = false;
 
         // some columns cannot be put on any column
@@ -328,12 +329,14 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 if(get_one_value(to_satisfy, row, col))   
                 {
                     unsigned int possibilities = 0;
-                    for(int i = 0; i < (int)data.can_be_put_here[col].size(); i++)
+                    for(int colidx = 0; colidx < M; colidx++)
                     {
-                        int colidx = data.can_be_put_here[col][i];
-                        if( get_one_value(can_be_one, row, colidx) )
+                        if( get_one_value(can_be_put_here, col, colidx) )
                         {
-                            possibilities |= 1 << colidx;
+                            if( get_one_value(can_be_one, row, colidx) )
+                            {
+                                possibilities |= 1 << colidx;
+                            }
                         }
                     }
 
@@ -452,9 +455,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                     //group on col not yet satisfied
                     if( get_one_value( group_to_satisfy, rowidx, col ) && (get_one_value( group_satisfied, rowidx, col ) == 0) )
                     {
-                        for(int whereidx = 0; whereidx < (int)data.where_can_be_put[col].size(); whereidx++)
+                        for(int candidate_col = 0; candidate_col < M; candidate_col++)
                         {
-                            int candidate_col = data.where_can_be_put[col][whereidx];
+                            if( get_one_value(where_can_be_put, col, candidate_col) == 0 ) continue;
                             if( col == candidate_col ) continue;
 
                             if( get_one_value( group_to_satisfy, rowidx, candidate_col ) && (get_one_value( group_satisfied, rowidx, candidate_col ) == 0) )
@@ -492,7 +495,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         for(int col = 0; col < M; col++)
         {
             if( data.column_destination[col] == -1 )
-                data.column_destination[col] = data.where_can_be_put[col][0];
+                for(int dest = 0; dest < M; dest++)
+                    if( get_one_value(where_can_be_put, col, dest) )
+                        data.column_destination[col] = dest;
         }
 
         //setting result on columns set before (correcting groups)
