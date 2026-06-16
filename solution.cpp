@@ -8,6 +8,7 @@
 //#include "generator.h"
 #include "ThreadPool.h"
 #include <getopt.h>
+#include <boost/container/static_vector.hpp>
 
 /*
 N rows, M columns
@@ -80,18 +81,18 @@ struct comparatorSatisfied
 constexpr int maxN = 8, maxM = 8;
 struct BackwardData
 {
-    std::vector<int> rows_on_row[maxN+1];  //which rows are put on i-th row
-    std::vector<int> rows_alone;    //which rows dont have any row put on them
-    std::vector<int> rows_set_on_itself; //which rows are set on itself in move
-    std::vector<std::pair<int, int> > to_satisfy;
-    std::vector<int> can_be_put_here[maxM+1]; //which columns CAN be put on i-th column
-    std::vector<int> where_can_be_put[maxM+1]; //for a column when it can be put
-    std::vector<std::pair<std::pair<int, int>, unsigned int > > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
+    boost::container::static_vector<int, maxN> rows_on_row[maxN+1];  //which rows are put on i-th row
+    boost::container::static_vector<int, maxN> rows_alone;    //which rows dont have any row put on them
+    boost::container::static_vector<int, maxN> rows_set_on_itself; //which rows are set on itself in move
+    boost::container::static_vector<std::pair<int, int>, maxN * maxM> to_satisfy;
+    boost::container::static_vector<int, maxM> can_be_put_here[maxM+1]; //which columns CAN be put on i-th column
+    boost::container::static_vector<int, maxM> where_can_be_put[maxM+1]; //for a column where it can be put
+    boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
-    std::vector<int> groups;
+    boost::container::static_vector<int, maxN> groups;
 
-    void ReserveSpace()
+    inline void ReserveSpace()
     {
         rows_alone.reserve(8);
         rows_set_on_itself.reserve(8);
@@ -100,18 +101,20 @@ struct BackwardData
         groups.reserve(8);
 
         for(int i = 0; i < N; i++)
+        {
+            group_mask[i] = 0ULL;
             rows_on_row[i].reserve(8);
+        }
 
         for(int i = 0; i < M; i++)
         {
             can_be_put_here[i].reserve(8);
             where_can_be_put[i].reserve(8);
             column_destination[i] = -1;
-            group_mask[i] = 0ULL;
         }
     }
 
-    void ZeroData()
+    inline void ZeroData()
     {
         rows_alone.clear();
         rows_set_on_itself.clear();
@@ -120,14 +123,16 @@ struct BackwardData
         groups.clear();
 
         for(int i = 0; i < N; i++)
+        {
+            group_mask[i] = 0ULL;
             rows_on_row[i].clear();
+        }
 
         for(int i = 0; i < M; i++)
         {
             can_be_put_here[i].clear();
             where_can_be_put[i].clear();
             column_destination[i] = -1;
-            group_mask[i] = 0ULL;
         }
     }
 };
@@ -619,7 +624,7 @@ int batch_size = 10000;
 std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> batch)
 {
     BackwardData data;
-    data.ReserveSpace();
+    //data.ReserveSpace();
 
     std::vector<Sub> input_wrong; 
 
@@ -627,9 +632,8 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
         return std::make_pair(0ULL, input_wrong);
 
     //printf("processing batch starting with %llu\n", batch -> at(0));
-    for(int i = 0; i < (int)(batch -> size()); i++)
+    for(auto &val : (*batch))
     {
-        Sub val = batch -> at(i);
         auto result = backwardgood(val, data, false);
         if(result.first == 0)
         {
@@ -745,11 +749,12 @@ int main(int argc, char** argv)
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
-    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
-    return 0;
+    std::cout << result.first << "\n";
+    return 0;*/
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
