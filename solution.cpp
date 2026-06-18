@@ -8,7 +8,6 @@
 //#include "generator.h"
 #include "ThreadPool.h"
 #include <getopt.h>
-#include <boost/container/static_vector.hpp>
 
 /*
 N rows, M columns
@@ -78,18 +77,19 @@ struct comparatorSatisfied
     }
 };
 
-constexpr int maxN = 8, maxM = 8;
+//const int maxN = 8, maxM = 8;
 struct BackwardData
 {
     boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
-    //boost::container::static_vector<int, maxN> groups;
+    boost::container::static_vector<int, maxN> groups;
+
+    std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
 
     inline void ReserveSpace()
     {
         satisfied_by.reserve(64);
-        //groups.reserve(8);
 
         for(int i = 0; i < N; i++)
         {
@@ -102,10 +102,17 @@ struct BackwardData
         }
     }
 
+    inline void ZeroResult()
+    {
+        back_result.first = 0ULL;
+        back_result.second.first.clear();
+        back_result.second.second.clear();
+    }
+
     inline void ZeroData()
     {
         satisfied_by.clear();
-        //groups.clear();
+        groups.clear();
 
         for(int i = 0; i < N; i++)
         {
@@ -119,7 +126,8 @@ struct BackwardData
     }
 };
 
-std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, BackwardData &data, bool debug)
+//std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, BackwardData &data, bool debug)
+void backwardgood(Sub to, BackwardData &data, bool debug)
 {
     int badcases1 = 0, badcases2 = 0, badcases3 = 0, badcasesvalid = 0;
 
@@ -217,7 +225,7 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
             data.group_mask[i] = 0ULL;
             if( std::popcount(get_row(rows_on_row, i)) == 0 ) continue; 
 
-            //data.groups.push_back(i);
+            data.groups.push_back(i);
             group_to_satisfy |= set_row_as(firstrowmask, i) & goal;
             for(int rowidx = 0; rowidx < N; rowidx++)
             {  
@@ -252,13 +260,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                 //printf("%d->%d\n", colidx, destcolidx);
 
                 bool allokay = true;
-                for(int group = 0; group < N; group++)
+                for(int group_idx = 0; group_idx < (int)data.groups.size(); group_idx++)
                 {
-                    if( std::popcount(get_row(rows_on_row, group) ) == 0 ) continue;
-                    
-                //for(int group_idx = 0; group_idx < (int)data.groups.size(); group_idx++)
-                //{
-                    //int group = data.groups[group_idx];
+                    int group = data.groups[group_idx];
                     Sub col_group = get_col(can_be_one, colidx) & data.group_mask[group];
                     Sub dest_col_group = get_col(goal, destcolidx) & data.group_mask[group];
 
@@ -412,12 +416,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
                      & move_col(not_yet_satisfied, data.column_destination[col], col);
                     
                     //updating group satisfied
-                    //for(int group_it = 0; group_it < (int)data.groups.size(); group_it++)
-                    //{
-                        //int grouprow = data.groups[group_it];
-                    for(int grouprow = 0; grouprow < N; grouprow++)
+                    for(int group_it = 0; group_it < (int)data.groups.size(); group_it++)
                     {
-                        if( std::popcount(get_row(rows_on_row, grouprow) ) == 0 ) continue;
+                        int grouprow = data.groups[group_it];
                         if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & data.group_mask[grouprow]) != 0ULL ) )
                             group_satisfied |= set_one_value(group_satisfied, grouprow, col);
                     }
@@ -520,12 +521,9 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         for(int col = 0; col < M; col++)
         {
             if( data.column_destination[col] == -1 ) continue;
-            //for(int i = 0; i < (int)data.groups.size(); i++)
-            //{
-                //int grouprow = data.groups[i];
-            for(int grouprow = 0; grouprow < N; grouprow++)
+            for(int i = 0; i < (int)data.groups.size(); i++)
             {
-                if( std::popcount(get_row(rows_on_row, grouprow) ) == 0 ) continue;
+                int grouprow = data.groups[i];
 
                 Sub group_rows_mask = data.group_mask[grouprow];
                 if( (get_one_value( group_to_satisfy, grouprow, col ) == 1) && (get_one_value( group_satisfied, grouprow, col ) == 0) )
@@ -594,40 +592,50 @@ std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub
         }
 
         //result was found
-        std::vector<int> result_col_moves;
-        result_col_moves.reserve(8);
-        for(int j = 0; j < M; j++)
-            result_col_moves.push_back(data.column_destination[j]);
+        //std::vector<int> result_col_moves;
+        //result_col_moves.reserve(8);
+        //for(int j = 0; j < M; j++)
+            //result_col_moves.push_back(data.column_destination[j]);
 
         //printf("\nbad cases: %d / %d / %d / not valid:%d / %d\n", badcases1, badcases2, badcases3, badcasesvalid, (int)rowmoves.size());
-        return std::make_pair(result, std::make_pair(row_move, result_col_moves));
+        //return std::make_pair(result, std::make_pair(row_move, result_col_moves));
+
+        data.back_result.first = result;
+        for(int i = 0; i < N; i++)
+            data.back_result.second.first.push_back(row_move[i]);
+        for(int j = 0; j < M; j++)
+            data.back_result.second.second.push_back(data.column_destination[j]);
+
+        return;
     }
 
-    std::vector<int> vempty = rowmoves[0];
-    return std::make_pair(0, std::make_pair(vempty, vempty)); //nothing found
+    //std::vector<int> vempty = rowmoves[0];
+    //return std::make_pair(0, std::make_pair(vempty, vempty)); //nothing found
+    return;
 }
 
 std::pair<bool, int> cycle_backwards(Sub start)
 {
     BackwardData data;
-    data.ReserveSpace();
+    //data.ReserveSpace();
 
     Sub s = start;
     int steps = 0;
     while( std::popcount(s) > 2 )
     {
-        auto res = backwardgood(s, data, false);
+        data.ZeroResult();
+        backwardgood(s, data, false);
 
-        Sub checkresult = check(res.first, res.second.first, res.second.second);
+        Sub checkresult = check(data.back_result.first, data.back_result.second.first, data.back_result.second.second);
 
-        if( (res.first == 0) || (checkresult != s) )
+        if( (data.back_result.first == 0) || (checkresult != s) )
         {
             printf("empty!!!\n");
             print_subset(s);
             return std::make_pair(false, steps);
         }
 
-        s = res.first;
+        s = data.back_result.first;
 
         steps++;
     }
@@ -650,8 +658,9 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
     //printf("processing batch starting with %llu\n", batch -> at(0));
     for(auto &val : (*batch))
     {
-        auto result = backwardgood(val, data, false);
-        if(result.first == 0)
+        data.ZeroResult();
+        backwardgood(val, data, false);
+        if(data.back_result.first == 0)
         {
             std::cout << val << " - result is zero\n";
             input_wrong.push_back(val);
@@ -668,7 +677,7 @@ std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> 
         printf("\n");
         printf("check:\n"); print_subset(check(result.first, result.second.first, result.second.second));*/
 
-        if(val != check(result.first, result.second.first, result.second.second))
+        if(val != check(data.back_result.first, data.back_result.second.first, data.back_result.second.second))
         {
             printf("(%llu) check is wrong (batch start:%llu)\n", val, batch -> at(0));
             input_wrong.push_back(val);
@@ -765,12 +774,12 @@ int main(int argc, char** argv)
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
     std::cout << result.first << "\n";
-    return 0;*/
+    return 0;
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);

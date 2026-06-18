@@ -1,4 +1,5 @@
 #include <vector>
+#include <boost/container/static_vector.hpp>
 #include <cstdio>
 
 typedef unsigned long long int Sub;
@@ -6,13 +7,15 @@ typedef unsigned long long int LLI;
 
 extern int N;
 extern int M;
+constexpr int maxN = 8;
+constexpr int maxM = 8;
 extern Sub generalfirstcolmask;
 
 //#define _BIT_INCLUDED_
 
 void print_subset(Sub s);
 bool is_any_zero_row_col(Sub s);
-Sub check(Sub start, std::vector<int> row_move, std::vector<int> col_move);
+Sub check(Sub start, boost::container::static_vector<int, maxN>& row_move, boost::container::static_vector<int, maxM>& col_move);
 
 inline bool is_valid(Sub s)
 {

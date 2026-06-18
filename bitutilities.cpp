@@ -32,7 +32,7 @@ bool is_any_zero_row_col(Sub s)
     return false;
 }
 
-Sub check(Sub start, std::vector<int> row_move, std::vector<int> col_move)
+Sub check(Sub start, boost::container::static_vector<int, maxN>& row_move, boost::container::static_vector<int, maxM>& col_move)
 {
     Sub result = 0ULL;
     for(int rowidx = 0; rowidx < N; rowidx++)
