@@ -136,10 +136,8 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
     //end data
 
-    for(int row_moveit = 0; row_moveit < (int)rowmoves.size(); row_moveit++)
+    for(auto &row_move : rowmoves)
     {
-        std::vector<int> row_move = rowmoves[row_moveit]; //current move
-
         //zero data
         data.ZeroData();
         
@@ -589,8 +587,8 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
         if( !is_valid(result) )
         {
             //std::cout << "to:" << to << "\n";
-            if( std::popcount(get_col(result, 0)) == 0 ) std::cout << "is not valid COL\n";
-            if( std::popcount(get_row(result, 0)) == 0 ) std::cout << "is not valid ROW\n";
+            //if( std::popcount(get_col(result, 0)) == 0 ) std::cout << "is not valid COL\n";
+            //if( std::popcount(get_row(result, 0)) == 0 ) std::cout << "is not valid ROW\n";
             /*std::cout << "result:\n";
             print_subset(result);
             std::cout << "can be one:\n";
@@ -778,12 +776,12 @@ int main(int argc, char** argv)
     std::unique_ptr<std::vector<Sub>> v = std::make_unique<std::vector<Sub>>(vv);
     auto result = processbatch(std::move(v)); return 0;*/    
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
     std::cout << result.first << "\n";
-    return 0;*/
+    return 0;
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
