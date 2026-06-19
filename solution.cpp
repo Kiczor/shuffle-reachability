@@ -84,7 +84,7 @@ struct BackwardData
     //boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
-    boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM> satisfied_by_amount[maxM + 1]; 
+    boost::container::static_vector<unsigned int, (maxN - 1) * maxM> satisfied_by_amount[maxM + 1]; 
     boost::container::static_vector<int, maxN> groups;
 
     std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
@@ -117,7 +117,7 @@ struct BackwardData
 //std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, BackwardData &data, bool debug)
 void backwardgood(Sub to, BackwardData &data, bool debug)
 {
-    int badcases1 = 0, badcases2 = 0, badcases3 = 0, badcasesvalid = 0;
+    int badcases1 = 0, badcases2impossible = 0, badcases2 = 0, badcases3 = 0, badcasesvalidcanbe = 0, badcasesvalid = 0;
 
     //data declaration:
     Sub _all_ones_mask = ~(0ULL); //2^64 - 1 
@@ -204,7 +204,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
         if( !is_valid(can_be_one) )
         {
             if(debug) printf("not valid\n");
-            badcasesvalid ++;
+            badcasesvalidcanbe ++;
             continue;
         }
 
@@ -258,8 +258,9 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                     //printf("col group:\n"); print_subset(col_group);
                     //printf("destination col group:\n"); print_subset(dest_col_group);
                     
-                    if( col_group != 0ULL && dest_col_group == 0ULL )
-                        allokay = false;                    
+                    //if( col_group != 0ULL && dest_col_group == 0ULL )
+                    //    allokay = false;
+                    allokay &= !(col_group != 0ULL && dest_col_group == 0ULL);                
                 }
 
                 if( allokay )
@@ -335,12 +336,20 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                         possibilities |= (get_one_value(can_be_put_here, col, colidx) & get_one_value(can_be_one, row, colidx)) << colidx;
                     }
 
-                    data.satisfied_by_amount[std::popcount(possibilities)].push_back(std::make_pair(std::make_pair(row, col), possibilities));
+                    // 8 bits for row, 8 for col, 8 for possibilities
+                    unsigned int val = row | (col << 8) | (possibilities << 16);
+
+                    //data.satisfied_by_amount[std::popcount(possibilities)].push_back(std::make_pair(std::make_pair(row, col), possibilities));
+                    data.satisfied_by_amount[std::popcount(possibilities)].push_back(val);
                 }
             }
         }
 
-        if( data.satisfied_by_amount[0].size() > 0 ) continue;
+        if( data.satisfied_by_amount[0].size() > 0 ) 
+        {
+            badcases2impossible++;
+            continue;
+        }
 
         //maybe priority queue?
         //sort(data.satisfied_by.begin(), data.satisfied_by.end(), comparatorSatisfied());
@@ -364,11 +373,17 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
             int satisfied_by_amount_size = data.satisfied_by_amount[sat_amount].size();
             for(int sat_amount_idx = 0; sat_amount_idx < satisfied_by_amount_size; sat_amount_idx++)
             {
-                std::pair<int, int> position = data.satisfied_by_amount[sat_amount][sat_amount_idx].first;
-                unsigned int satisfied_by_mask = data.satisfied_by_amount[sat_amount][sat_amount_idx].second;
+                //std::pair<int, int> position = data.satisfied_by_amount[sat_amount][sat_amount_idx].first;
+                //unsigned int satisfied_by_mask = data.satisfied_by_amount[sat_amount][sat_amount_idx].second;
+                unsigned int v = data.satisfied_by_amount[sat_amount][sat_amount_idx];
+                unsigned int mask8 = (1 << 8) - 1;
+                int position_row = v & mask8; v >>= 8;
+                int position_col = v & mask8; v >>= 8;
+                int satisfied_by_mask = v & mask8;
+                //std::pair<int, int> position = std::make_pair(x, y);
 
                 //nothing to do
-                if( get_one_value(already_satisfied, position.first, position.second) ) continue;
+                if( get_one_value(already_satisfied, position_row, position_col) ) continue;
 
                 for(int col = 0; col < M; col++)
                 {
@@ -376,12 +391,12 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
 
                     if( data.column_destination[col] == -1 )
                     {
-                        data.column_destination[col] = position.second;
+                        data.column_destination[col] = position_col;
 
                         Sub not_yet_satisfied = ~already_satisfied;
-                        already_satisfied |= move_col( can_be_one, col, position.second ) & rows_alone_mask & goal;
+                        already_satisfied |= move_col( can_be_one, col, position_col ) & rows_alone_mask & goal;
                         
-                        /*printf("setting %d -> %d to satisfy (%d, %d)\n", col, column_destination[col], position.first, position.second);
+                        /*printf("setting %d -> %d to satisfy (%d, %d)\n", col, column_destination[col], position_row, position_col);
                         printf("not yet satisfied:\n");
                         print_subset(not_yet_satisfied);
                         printf("result:\n");
@@ -409,7 +424,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                     }
                 }
 
-                if( get_one_value(already_satisfied, position.first, position.second) == 0 )
+                if( get_one_value(already_satisfied, position_row, position_col) == 0 )
                     everyone_satisfied = false;
             }
         }
@@ -589,8 +604,8 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
         if( !is_valid(result) )
         {
             //std::cout << "to:" << to << "\n";
-            if( std::popcount(get_col(result, 0)) == 0 ) std::cout << "is not valid COL\n";
-            if( std::popcount(get_row(result, 0)) == 0 ) std::cout << "is not valid ROW\n";
+            //if( std::popcount(get_col(result, 0)) == 0 ) std::cout << "is not valid COL\n";
+            //if( std::popcount(get_row(result, 0)) == 0 ) std::cout << "is not valid ROW\n";
             /*std::cout << "result:\n";
             print_subset(result);
             std::cout << "can be one:\n";
@@ -599,7 +614,8 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
             continue;
         }
 
-        //printf("\nbad cases: %d / %d / %d / not valid:%d / %d\n", badcases1, badcases2, badcases3, badcasesvalid, (int)rowmoves.size());
+        printf("\nbad cases: %d / (impossible):%d / (algo didnt find):%d / %d / not valid can be one:%d / not valid result: %d / %d\n", 
+            badcases1, badcases2impossible, badcases2, badcases3, badcasesvalidcanbe, badcasesvalid, (int)rowmoves.size());
 
         //result was found
         data.back_result.first = result;
@@ -778,12 +794,12 @@ int main(int argc, char** argv)
     std::unique_ptr<std::vector<Sub>> v = std::make_unique<std::vector<Sub>>(vv);
     auto result = processbatch(std::move(v)); return 0;*/    
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
     std::cout << result.first << "\n";
-    return 0;*/
+    return 0;
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
