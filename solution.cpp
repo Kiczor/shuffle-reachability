@@ -86,7 +86,6 @@ struct BackwardData
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
     boost::container::static_vector<unsigned int, (maxN - 1) * maxM> satisfied_by_amount[maxM + 1]; 
     boost::container::static_vector<int, maxN> groups;
-    //int how_many_satisfied [maxM][maxM];
 
     std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
 
@@ -105,8 +104,6 @@ struct BackwardData
         for(int i = 0; i < N; i++)
         {
             group_mask[i] = 0ULL;
-            //for(int j = 0; j < M; j++)
-            //    how_many_satisfied[i][j] = 0;
         }
 
         for(int i = 0; i <= M; i++)
@@ -414,84 +411,106 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                 //print_subset(already_satisfied);
                 
                 //std::sort(data.satisfied_by_amount[sat_amount].begin(), data.satisfied_by_amount[sat_amount].end(), std::greater<int>());
-                //int satisfied_by_amount_size = data.satisfied_by_amount[sat_amount].size();
+                int satisfied_by_amount_size = data.satisfied_by_amount[sat_amount].size();
                 //for(int sat_amount_idx = 0; sat_amount_idx < satisfied_by_amount_size; sat_amount_idx++)
-                if( (int)data.satisfied_by_amount[sat_amount].size() > 0 )
+                if( satisfied_by_amount_size > 0 )
                 {
-                    //std::pair<int, int> position = data.satisfied_by_amount[sat_amount][sat_amount_idx].first;
-                    //unsigned int satisfied_by_mask = data.satisfied_by_amount[sat_amount][sat_amount_idx].second;
-                    unsigned int v = data.satisfied_by_amount[sat_amount][ data.satisfied_by_amount[sat_amount].size() - 1 ];
-                    data.satisfied_by_amount[sat_amount].pop_back();
+                    int best_cover = 0;
+                    int col = -1;
+                    int index = -1;
+
+                    for(int i = 0; i < satisfied_by_amount_size; i++)
+                    {
+                        //std::pair<int, int> position = data.satisfied_by_amount[sat_amount][sat_amount_idx].first;
+                        //unsigned int satisfied_by_mask = data.satisfied_by_amount[sat_amount][sat_amount_idx].second;
+                        unsigned int v = data.satisfied_by_amount[sat_amount][i];
+                        unsigned int mask8 = (1 << 8) - 1;
+                        int position_row = v & mask8; v >>= 8;
+                        int position_col = v & mask8; v >>= 8;
+                        int satisfied_by_mask = v & mask8;
+
+                        //nothing to do
+                        //if( get_one_value(already_satisfied, position_row, position_col) ) continue;
+
+                        //printf("position row %d, col %d, satisfied_by_mask:\n", position_row, position_col); print_subset(satisfied_by_mask);
+                        int best_candidate = -1, best_candidate_cover = 0;
+                        for(int candidate = 0; candidate < M; candidate++)
+                        {
+                            if( (((1 << candidate) & satisfied_by_mask) == 0) || (data.column_destination[candidate] != -1) ) continue;
+
+                            Sub not_yet_satisfied = (~already_satisfied) & to_satisfy;
+                            int how_many_satisfied = std::popcount( move_col(can_be_one, candidate, position_col) & get_col(not_yet_satisfied, position_col) );
+                            //printf("CANDIDATE %d -> position %d, how many satisfied:%d\n", candidate, position_col, how_many_satisfied);
+
+                            if( how_many_satisfied > best_candidate_cover )
+                            {
+                                best_candidate = candidate;
+                                best_candidate_cover = how_many_satisfied;
+                            }
+                        }
+
+                        if( best_candidate_cover > best_cover )
+                        {
+                            best_cover = best_candidate_cover;
+                            col = best_candidate;
+                            index = i;
+                        }
+                    }
+
+                    unsigned int v = data.satisfied_by_amount[sat_amount][index];
                     unsigned int mask8 = (1 << 8) - 1;
                     int position_row = v & mask8; v >>= 8;
                     int position_col = v & mask8; v >>= 8;
                     int satisfied_by_mask = v & mask8;
 
-                    //nothing to do
-                    if( get_one_value(already_satisfied, position_row, position_col) ) continue;
-
-                    //printf("position row %d, col %d, satisfied_by_mask:\n", position_row, position_col); print_subset(satisfied_by_mask);
-                    int col = -1, best_cover = 0;
-                    for(int candidate_col = 0; candidate_col < M; candidate_col++)
-                    {
-                        if( (((1 << candidate_col) & satisfied_by_mask) == 0) || (data.column_destination[candidate_col] != -1) ) continue;
-
-                        //printf("CANDIDATE %d -> position %d, how many satisfied:%d\n", candidate_col, position_col, data.how_many_satisfied[candidate_col][position_col]);
-                        Sub not_yet_satisfied = (~already_satisfied) & to_satisfy;
-                        int how_many_satisfied = std::popcount( move_col(can_be_one, candidate_col, position_col) & get_col(not_yet_satisfied, position_col) );
-                        if( how_many_satisfied > best_cover )
-                        {
-                            col = candidate_col;
-                            best_cover = how_many_satisfied;
-                        }
-                    }
+                    std::swap( data.satisfied_by_amount[sat_amount][index], data.satisfied_by_amount[sat_amount][satisfied_by_amount_size - 1] );
+                    data.satisfied_by_amount[sat_amount].pop_back();
 
                     //printf("FOUND COL (%d): %d, best_cover:%d\n", sat_amount, col, best_cover);
                     
-                    if( col != -1 )
-                    {
-                        if( ((1 << col) & satisfied_by_mask) == 0 ) continue;
-
-                        if( data.column_destination[col] == -1 )
-                        {
-                            data.column_destination[col] = position_col;
-
-                            //Sub not_yet_satisfied = ~already_satisfied;
-                            Sub not_yet_satisfied = (~already_satisfied) & to_satisfy;
-                            already_satisfied |= move_col( can_be_one, col, position_col ) & rows_alone_mask & goal;
-                            
-                            /*printf("setting %d -> %d to satisfy (%d, %d)\n", col, column_destination[col], position_row, position_col);
-                            printf("not yet satisfied:\n");
-                            print_subset(not_yet_satisfied);
-                            printf("result:\n");
-                            print_subset(result);
-                            printf("get_col( can_be_one, col )\n");
-                            print_subset(get_col( can_be_one, col ));
-                            printf("move_col(goal, column_destination[col], col):\n");
-                            print_subset(move_col(goal, column_destination[col], col));*/
-
-                            //setting 1 on alone rows satisfied (only ones that have destination currently)
-                            result |= get_col( can_be_one, col )
-                            & rows_alone_mask
-                            & move_col(goal, data.column_destination[col], col) 
-                            & move_col(not_yet_satisfied, data.column_destination[col], col);
-                            
-                            //updating group satisfied
-                            for(int group_it = 0; group_it < (int)data.groups.size(); group_it++)
-                            {
-                                int grouprow = data.groups[group_it];
-                                if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & data.group_mask[grouprow]) != 0ULL ) )
-                                    group_satisfied |= set_one_value(group_satisfied, grouprow, col);
-                            }
-                            
-                            //break;
-                        }
-                    }
-                    else
+                    if( col == -1 )
                     {
                         everyone_satisfied = false;
                         break;
                     }
+                    
+                    //if( ((1 << col) & satisfied_by_mask) == 0 ) continue;
+
+                    //if( data.column_destination[col] != -1 ) continue;
+                    {
+                        data.column_destination[col] = position_col;
+
+                        //Sub not_yet_satisfied = ~already_satisfied;
+                        Sub not_yet_satisfied = (~already_satisfied) & to_satisfy;
+                        already_satisfied |= move_col( can_be_one, col, position_col ) & rows_alone_mask & goal;
+                        
+                        /*printf("setting %d -> %d to satisfy (%d, %d)\n", col, column_destination[col], position_row, position_col);
+                        printf("not yet satisfied:\n");
+                        print_subset(not_yet_satisfied);
+                        printf("result:\n");
+                        print_subset(result);
+                        printf("get_col( can_be_one, col )\n");
+                        print_subset(get_col( can_be_one, col ));
+                        printf("move_col(goal, column_destination[col], col):\n");
+                        print_subset(move_col(goal, column_destination[col], col));*/
+
+                        //setting 1 on alone rows satisfied (only ones that have destination currently)
+                        result |= get_col( can_be_one, col )
+                        & rows_alone_mask
+                        & move_col(goal, data.column_destination[col], col) 
+                        & move_col(not_yet_satisfied, data.column_destination[col], col);
+                        
+                        //updating group satisfied
+                        for(int group_it = 0; group_it < (int)data.groups.size(); group_it++)
+                        {
+                            int grouprow = data.groups[group_it];
+                            if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & data.group_mask[grouprow]) != 0ULL ) )
+                                group_satisfied |= set_one_value(group_satisfied, grouprow, col);
+                        }
+                        
+                        //break;
+                    }
+                    
 
                     /*printf("position (row %d, col %d), col going to pos_col:%d\n", position_row, position_col, col);
                     printf("to_satisfy:\n");print_subset(to_satisfy);
@@ -530,7 +549,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
 
                             if( ((1 << col) & other_sat_mask) != 0 ) //when current assign changes others possibilities
                             {
-                                //value ^= (1 << (16 + col));
+                                value ^= (1 << (16 + col));
                                 if( get_one_value(already_satisfied, x, y) == 0 )
                                     data.satisfied_by_amount[s - 1].push_back(value);
 
@@ -936,12 +955,12 @@ int main(int argc, char** argv)
     std::unique_ptr<std::vector<Sub>> v = std::make_unique<std::vector<Sub>>(vv);
     auto result = processbatch(std::move(v)); return 0;*/
 
-    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
     std::cout << result.first << "\n";
-    return 0;*/
+    return 0;
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
