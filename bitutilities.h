@@ -5,8 +5,8 @@
 typedef unsigned long long int Sub;
 typedef unsigned long long int LLI;
 
-extern int N;
-extern int M;
+//extern int N, M;
+constexpr int N = 8, M = 8;
 constexpr int maxN = 8;
 constexpr int maxM = 8;
 extern Sub generalfirstcolmask;
@@ -17,6 +17,7 @@ void print_subset(Sub s);
 bool is_any_zero_row_col(Sub s);
 Sub check(Sub start, boost::container::static_vector<int, maxN>& row_move, boost::container::static_vector<int, maxM>& col_move);
 
+//[[gnu::always_inline, clang::always_inline]]
 inline bool is_valid(Sub s)
 {
     Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
@@ -25,6 +26,7 @@ inline bool is_valid(Sub s)
     return ((s & firstrowmask) != 0ULL) && ((s & firstcolmask) != 0ULL);
 }
 
+//[[gnu::always_inline, clang::always_inline]]
 inline Sub get_row_to_zero(Sub s, int idx)
 {
     LLI before = (LLI)(idx * M);
@@ -34,45 +36,64 @@ inline Sub get_row_to_zero(Sub s, int idx)
 }
 
 //refactor?
+//[[gnu::always_inline, clang::always_inline]]
 inline Sub set_row_as(LLI row, int where)
 {
     return row << (LLI)(where * M);
 }
 
-inline Sub get_row(Sub s, int idx)
+/*inline Sub get_row(Sub s, int idx)
 {
     LLI before = (LLI)(idx * M);
     Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
     LLI mask = firstrowmask << before;
     return (s & mask);
+}*/
+
+//[[gnu::always_inline, clang::always_inline]]
+inline Sub get_row(Sub s, int idx)
+{
+    //Sub firstrowmask = ((1ULL << (LLI)M) - 1ULL);
+    return s & (((1ULL << (LLI)M) - 1ULL) << (LLI)(idx * M));
 }
 
-inline Sub move_row(Sub s, LLI from, LLI to)
+/*inline Sub move_row(Sub s, LLI from, LLI to)
 {
     LLI before = (LLI)(from * M);
     Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
     Sub mask = firstrowmask << before;
     return ((s & mask) >> before) << ((LLI)( to * M ));
+}*/
+
+//[[gnu::always_inline, clang::always_inline]]
+inline Sub move_row(Sub s, LLI from, LLI to)
+{
+    //Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
+    return ((s >> (LLI)(from * M)) & ((1ULL << (LLI)M) - 1ULL)) << ((LLI)( to * M ));
 }
 
+//[[gnu::always_inline, clang::always_inline]]
 inline Sub get_col(Sub s, int idx)
 {
-    LLI mask = generalfirstcolmask << (LLI)idx;
-    return (s & mask);
+    //LLI mask = generalfirstcolmask << (LLI)idx;
+    return (s & (generalfirstcolmask << (LLI)idx));
 }
 
+//[[gnu::always_inline, clang::always_inline]]
 inline Sub move_col(Sub s, LLI from, LLI to)
 {
-    Sub mask = generalfirstcolmask << (LLI)from;
+    //Sub mask = generalfirstcolmask << (LLI)from;
 
-    return ( (s & mask) >> from ) << to;
+    return ( (s & (generalfirstcolmask << (LLI)from)) >> from ) << to;
 }
 
+//[[gnu::always_inline, clang::always_inline]]
 inline Sub set_one_value(Sub s, int idxrow, int idxcol)
 {
     return s | (1ULL << (LLI)(M * idxrow + idxcol));
 }
 
+//[[gnu::always_inline, clang::always_inline]]
 inline bool get_one_value(Sub s, int idxrow, int idxcol)
 {
     return (s >> (LLI)(M * idxrow + idxcol)) & 1ULL;

@@ -25,7 +25,8 @@ bits 8x8 case:
 typedef unsigned long long int Sub;
 typedef unsigned long long int LLI;
 
-int N, M;
+//int N, M;
+//constexpr int N = 8, M = 8;
 Sub generalfirstcolmask;
 //Sub generalfirstrowmask;
 std::vector< std::vector<int> > rowmoves;
@@ -114,7 +115,6 @@ struct BackwardData
     }
 };
 
-//std::pair<Sub, std::pair<std::vector<int>, std::vector<int> > > backwardgood(Sub to, BackwardData &data, bool debug)
 void backwardgood(Sub to, BackwardData &data, bool debug)
 {
     int badcases1 = 0, badcases2impossible = 0, badcases2 = 0, badcases3 = 0, badcasesvalidcanbe = 0, badcasesvalid = 0;
@@ -510,32 +510,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                         
                         //break;
                     }
-                    
-
-                    /*printf("position (row %d, col %d), col going to pos_col:%d\n", position_row, position_col, col);
-                    printf("to_satisfy:\n");print_subset(to_satisfy);
-                    printf("already satisfied:\n"); print_subset(already_satisfied);
-                    std::cout << "before swapping:\n";
-                    for(int s = 0; s <= M; s++)
-                    {
-                        printf("Sat amount=%d\n", s);
-                        for(int i = 0; i < (int)data.satisfied_by_amount[s].size(); i++)
-                        {
-                            int v = data.satisfied_by_amount[s][i];
-                            unsigned int mask8 = (1 << 8) - 1;
-                            int position_row = v & mask8; v >>= 8;
-                            int position_col = v & mask8; v >>= 8;
-                            int satisfied_by_mask = v & mask8;
-                            
-                            printf("row: %d, col:%d, satmask: ", position_row, position_col);
-                            for(int j = 0; j < M; j++)
-                                if( satisfied_by_mask & (1 << j) )
-                                    printf("1");
-                                else
-                                    printf("0");
-                            printf("\n");
-                        }
-                    }*/
 
                     for(int s = 1; s <= M; s++)
                     {
@@ -919,9 +893,10 @@ int main(int argc, char** argv)
     }
 
     bool is_inverted = true;
-    int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
-    std::cin >> N >> M >> howmanyones_lower_row >> howmanyones_upper_row >> howmanyones_lower_col >> howmanyones_upper_col;
+   // int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
+    //std::cin >> N >> M >> howmanyones_lower_row >> howmanyones_upper_row >> howmanyones_lower_col >> howmanyones_upper_col;
     //M = N;
+    int howmanyones_lower_row = 2, howmanyones_upper_row = M - 2, howmanyones_lower_col = 2, howmanyones_upper_col = N - 2;
 
     std::ofstream output_file, wrong_file;
     output_file.open(output_file_name);
