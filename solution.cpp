@@ -30,7 +30,7 @@ typedef unsigned long long int LLI;
 //constexpr int N = 8, M = 8;
 Sub generalfirstcolmask;
 //Sub generalfirstrowmask;
-std::list< std::vector<int> > rowmoves;
+std::vector< std::vector<int> > rowmoves;
 
 std::vector< std::vector<int> > generate_moves(int dim)
 {
@@ -91,11 +91,12 @@ struct BackwardData
 
     std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
 
-    std::list<std::vector<int>> list_row_moves;
+    std::list< int > list_row_moves;
     
     inline void Initialize()
     {
-        list_row_moves = rowmoves;
+        for(int i = 0; i < (int)rowmoves.size(); i++)
+            list_row_moves.push_back(i);
     }
 
     inline void ZeroResult()
@@ -145,7 +146,8 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
 
     for(auto row_move_iterator = data.list_row_moves.begin(); row_move_iterator != data.list_row_moves.end(); row_move_iterator++)
     {
-        std::vector<int> row_move = *row_move_iterator;
+        int row_move_index = *row_move_iterator;
+        std::vector<int>& row_move = rowmoves[row_move_index];
         //zero data
         data.ZeroData();
         
@@ -682,7 +684,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
             data.back_result.second.second.push_back(data.column_destination[j]);
 
         data.list_row_moves.erase( row_move_iterator );
-        data.list_row_moves.push_front( row_move );
+        data.list_row_moves.push_front( row_move_index );
 
         return;
     }
@@ -846,16 +848,13 @@ int main(int argc, char** argv)
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
 
-    std::vector< std::vector<int> > tmp_rowmoves = generate_moves(N);
+    rowmoves = generate_moves(N);
 
     /*std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(rowmoves.begin(), rowmoves.end(), g);*/
     srand(67);
-    std::random_shuffle(tmp_rowmoves.begin(), tmp_rowmoves.end());
-
-    for(std::vector<int>& v : tmp_rowmoves) 
-        rowmoves.push_back(v);
+    std::random_shuffle(rowmoves.begin(), rowmoves.end());
 
     /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
