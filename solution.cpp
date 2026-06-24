@@ -8,6 +8,7 @@
 //#include "generator.h"
 #include "ThreadPool.h"
 #include <getopt.h>
+#include <list>
 
 /*
 N rows, M columns
@@ -29,7 +30,7 @@ typedef unsigned long long int LLI;
 //constexpr int N = 8, M = 8;
 Sub generalfirstcolmask;
 //Sub generalfirstrowmask;
-std::vector< std::vector<int> > rowmoves;
+std::list< std::vector<int> > rowmoves;
 
 std::vector< std::vector<int> > generate_moves(int dim)
 {
@@ -90,6 +91,13 @@ struct BackwardData
 
     std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
 
+    std::list<std::vector<int>> list_row_moves;
+    
+    inline void Initialize()
+    {
+        list_row_moves = rowmoves;
+    }
+
     inline void ZeroResult()
     {
         back_result.first = 0ULL;
@@ -136,10 +144,14 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
     //end data
 
-    for(int row_moveit = 0; row_moveit < (int)rowmoves.size(); row_moveit++)
+    //for(int row_moveit = 0; row_moveit < (int)rowmoves.size(); row_moveit++)
+    //{
+    //    std::vector<int> row_move = rowmoves[row_moveit]; //current move
+    //for(std::vector<int>& row_move : rowmoves)
+    //{
+    for(auto row_move_iterator = data.list_row_moves.begin(); row_move_iterator != data.list_row_moves.end(); row_move_iterator++)
     {
-        std::vector<int> row_move = rowmoves[row_moveit]; //current move
-
+        std::vector<int> row_move = *row_move_iterator;
         //zero data
         data.ZeroData();
         
@@ -759,6 +771,9 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
         for(int j = 0; j < M; j++)
             data.back_result.second.second.push_back(data.column_destination[j]);
 
+        data.list_row_moves.erase( row_move_iterator );
+        data.list_row_moves.push_front( row_move );
+
         return;
     }
 
@@ -770,6 +785,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
 std::pair<bool, int> cycle_backwards(Sub start)
 {
     BackwardData data;
+    data.Initialize();
 
     Sub s = start;
     int steps = 0;
@@ -800,6 +816,7 @@ int batch_size = 10000;
 std::pair<Sub, std::vector<Sub>> processbatch(std::unique_ptr<std::vector<Sub>> batch)
 {
     BackwardData data;
+    data.Initialize();
 
     std::vector<Sub> input_wrong; 
 
@@ -849,7 +866,7 @@ int main(int argc, char** argv)
     int number_of_threads = 1;
     int number_of_generating_threads = 1;
     int start_position_rows = 0, end_position_rows = 10000;
-    LLI queue_item_limit = 10000000;
+    LLI queue_item_limit = 20000000;
     std::string output_file_name = "result.out", wrong_file_name = "wrong.out";
 
     int optc;
@@ -893,7 +910,7 @@ int main(int argc, char** argv)
     }
 
     bool is_inverted = true;
-   // int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
+    //int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
     //std::cin >> N >> M >> howmanyones_lower_row >> howmanyones_upper_row >> howmanyones_lower_col >> howmanyones_upper_col;
     //M = N;
     int howmanyones_lower_row = 2, howmanyones_upper_row = M - 2, howmanyones_lower_col = 2, howmanyones_upper_col = N - 2;
@@ -910,14 +927,6 @@ int main(int argc, char** argv)
 
     for(int i = 0; i < N; i++)
         generalfirstcolmask += (1ULL << (LLI)(i * M));
-    
-    rowmoves = generate_moves(N);
-
-    /*std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(rowmoves.begin(), rowmoves.end(), g);*/
-    srand(67);
-    std::random_shuffle(rowmoves.begin(), rowmoves.end());
 
     int possible_rows_size = 0;
     for(Sub s = 0LL; s < (Sub)(1LL << (LLI)M); s++)
@@ -926,9 +935,17 @@ int main(int argc, char** argv)
     
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
-    /*std::vector<Sub> vv = {18230450}; //5x5
-    std::unique_ptr<std::vector<Sub>> v = std::make_unique<std::vector<Sub>>(vv);
-    auto result = processbatch(std::move(v)); return 0;*/
+
+    std::vector< std::vector<int> > tmp_rowmoves = generate_moves(N);
+
+    /*std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(rowmoves.begin(), rowmoves.end(), g);*/
+    srand(67);
+    std::random_shuffle(tmp_rowmoves.begin(), tmp_rowmoves.end());
+
+    for(std::vector<int>& v : tmp_rowmoves) 
+        rowmoves.push_back(v);
 
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
