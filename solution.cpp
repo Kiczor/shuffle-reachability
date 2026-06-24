@@ -82,11 +82,12 @@ struct comparatorSatisfied
 
 struct BackwardData
 {
-    //boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
     int column_destination[maxM+1]; //where column will be put
     Sub group_mask[maxN+1]; //mask with ones on rows that converge to row i
-    boost::container::static_vector<unsigned int, (maxN - 1) * maxM> satisfied_by_amount[maxM + 1]; 
     boost::container::static_vector<int, maxN> groups;
+
+    //for each 1 to satisfy which columns satisfy that 1 organized by amount of such columns
+    boost::container::static_vector<unsigned int, (maxN - 1) * maxM> satisfied_by_amount[maxM + 1]; 
 
     std::pair<Sub, std::pair<boost::container::static_vector<int, maxN>, boost::container::static_vector<int, maxM>>> back_result;
 
@@ -106,7 +107,6 @@ struct BackwardData
 
     inline void ZeroData()
     {
-        //satisfied_by.clear();
         groups.clear();
 
         for(int i = 0; i < N; i++)
@@ -857,12 +857,12 @@ int main(int argc, char** argv)
     for(std::vector<int>& v : tmp_rowmoves) 
         rowmoves.push_back(v);
 
-    CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
     std::unique_ptr<std::vector<Sub>> v = mygenerator.generate_with_ones_batch(batch_size, true);
     auto result = processbatch(std::move(v));
     std::cout << result.first << "\n";
-    return 0;
+    return 0;*/
 
     /*
     CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, is_inverted, 0, 1000);
@@ -945,7 +945,6 @@ int main(int argc, char** argv)
 
         {
             std::unique_lock<std::mutex> lock(generate_thread_pool -> result_mutex);
-            //generate_thread_pool->some_work_ended.wait(lock);
             generate_thread_pool->some_work_ended.wait(lock, [&]{ return (generate_thread_pool -> result_queue.size()) > 0; });
 
             while( !(generate_thread_pool -> result_queue).empty() )
@@ -959,7 +958,7 @@ int main(int argc, char** argv)
                 output_file << "[MAIN] generated batch " << count_generated << ", START: " << ((gen_res.second -> size() > 0) ? gen_res.second -> at(0) : 0 )   
                 << ", ID:" << gen_res.first -> startidx << " | progress estimation: " << gen_res.first -> get_progress() << "\n";
 
-                //gen_res.first -> print_rows_progress();
+                std::cout << gen_res.first -> string_rows_progress(3) << "\n";
 
                 generator_progress[gen_res.first -> startidx] = gen_res.first -> get_progress();
 
@@ -1036,7 +1035,6 @@ int main(int argc, char** argv)
     {
         {
             std::unique_lock<std::mutex> lock(solve_thread_pool -> result_mutex);
-            //solve_thread_pool->some_work_ended.wait(lock);
             solve_thread_pool->some_work_ended.wait(lock, [&]{ return (solve_thread_pool -> result_queue.size()) > 0; });
 
             std::cout << "locked, result queue size: " << solve_thread_pool -> result_queue.size() << "\n";

@@ -61,3 +61,5 @@ vcpkg_installed/
 tests/
 Testing/
 .cache/
+
+callgrind.*

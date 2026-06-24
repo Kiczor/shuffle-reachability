@@ -1,5 +1,6 @@
 #include <vector>
 #include <memory>
+#include <string>
 
 #ifndef _BIT_INCLUDED_
 #define _BIT_INCLUDED_
@@ -42,7 +43,7 @@ public:
     std::unique_ptr<std::vector<Sub>> generate_with_ones_batch(int,bool);
     std::unique_ptr<std::vector<Sub>> generate_with_ones_batch_inverted(int,bool);
     double get_progress();
-    void print_rows_progress();
+    std::string string_rows_progress(int limit);
     std::vector<Sub> get_possible_rows();
     void start_generator();
 };

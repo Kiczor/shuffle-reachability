@@ -62,12 +62,13 @@ void CasesGenerator::start_generator()
     }
 }
 
-void CasesGenerator::print_rows_progress()
+std::string CasesGenerator::string_rows_progress(int limit)
 {
-    printf("\n (%d) ", (int)possible_rows.size());
-    for(int i = 0; i < N; i++)
-        printf("[%d: %d] ", i, rows_gen_idx[i]);
-    printf("\n");
+    std::string res;
+    //res += "(" + std::to_string((int)possible_rows.size()) + ")";
+    for(int i = 0; i < std::min(limit, N); i++)
+        res += "[" + std::to_string(i) + ": " + std::to_string(rows_gen_idx[i]) + "] ";
+    return res; 
 }
 
 double CasesGenerator::get_progress()
@@ -83,8 +84,6 @@ double CasesGenerator::get_progress()
     }
     progress += multiply * (rows_gen_idx[0] - startidx);
     all += multiply * (endidx - startidx);
-
-    print_rows_progress();
 
     return 100.0 * ((double)progress / (double)all);
     //return (100.0 * (double)(rows_gen_idx[0] - startidx)) / (double)(endidx - startidx);

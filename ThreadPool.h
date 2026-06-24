@@ -140,7 +140,7 @@ bool ThreadPool<T_IN, T_OUT>::ResultsLeftToCollect()
     {
         std::unique_lock<std::mutex> lock(result_mutex);
         resultempty = !result_queue.empty();
-        std::cout << "[POOL] anything to collect?:" << resultempty << "\n";
+        //std::cout << "[POOL] anything to collect?:" << resultempty << "\n";
     }
     return resultempty;
 }
