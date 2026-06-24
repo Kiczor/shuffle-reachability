@@ -42,28 +42,12 @@ inline Sub set_row_as(LLI row, int where)
     return row << (LLI)(where * M);
 }
 
-/*inline Sub get_row(Sub s, int idx)
-{
-    LLI before = (LLI)(idx * M);
-    Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
-    LLI mask = firstrowmask << before;
-    return (s & mask);
-}*/
-
 //[[gnu::always_inline, clang::always_inline]]
 inline Sub get_row(Sub s, int idx)
 {
     //Sub firstrowmask = ((1ULL << (LLI)M) - 1ULL);
     return s & (((1ULL << (LLI)M) - 1ULL) << (LLI)(idx * M));
 }
-
-/*inline Sub move_row(Sub s, LLI from, LLI to)
-{
-    LLI before = (LLI)(from * M);
-    Sub firstrowmask = (1ULL << (LLI)M) - 1ULL;
-    Sub mask = firstrowmask << before;
-    return ((s & mask) >> before) << ((LLI)( to * M ));
-}*/
 
 //[[gnu::always_inline, clang::always_inline]]
 inline Sub move_row(Sub s, LLI from, LLI to)

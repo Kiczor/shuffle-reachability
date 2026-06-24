@@ -80,7 +80,6 @@ struct comparatorSatisfied
     }
 };
 
-//const int maxN = 8, maxM = 8;
 struct BackwardData
 {
     //boost::container::static_vector<std::pair<std::pair<int, int>, unsigned int >, maxN * maxM > satisfied_by; //for each 1 to satisfy which columns satisfy that 1
@@ -144,11 +143,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
     Sub group_satisfied; // whether 1 on position i,j that group converges into is already satisfied
     //end data
 
-    //for(int row_moveit = 0; row_moveit < (int)rowmoves.size(); row_moveit++)
-    //{
-    //    std::vector<int> row_move = rowmoves[row_moveit]; //current move
-    //for(std::vector<int>& row_move : rowmoves)
-    //{
     for(auto row_move_iterator = data.list_row_moves.begin(); row_move_iterator != data.list_row_moves.end(); row_move_iterator++)
     {
         std::vector<int> row_move = *row_move_iterator;
@@ -234,25 +228,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
             }
         }
 
-        /*for(int i = 0; i < (int)groups.size(); i++)
-        {
-            group = groups[i];
-            for(int j = 0; j < M; j++)
-            {
-                if( (group_mask[j] & ) == 0ULL )
-                {
-                    to_satisfy.push_back(std::make_pair(group, j));
-                }
-            }
-        }
-
-        if(debug)
-        {
-            printf("to satisfy: ");
-            for(int i = 0; i < (int)to_satisfy.size(); i++) printf("(%d, %d) ", to_satisfy[i].first, to_satisfy[i].second);
-            printf("\n");
-        }*/
-
         for(int colidx = 0; colidx < M; colidx++)
         {
             for(int destcolidx = 0; destcolidx < M; destcolidx++)
@@ -332,21 +307,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
             continue;
         }
 
-        /*for(int colidx = 0; colidx < M; colidx++)
-        {
-            for(int destcolidx = 0; destcolidx < M; destcolidx++)
-            {
-                Sub sat = 0ULL;
-                if(get_one_value(where_can_be_put, colidx, destcolidx))
-                {
-                    sat = move_col(can_be_one, colidx, destcolidx) & get_col(to_satisfy, destcolidx);
-                    //printf("%d->%d:\nsat:\n", colidx, destcolidx);
-                    //print_subset(sat);
-                }
-                data.how_many_satisfied[colidx][destcolidx] = std::popcount(sat);
-            }
-        }*/
-
         for(int row = 0; row < N; row++)
         {
             for(int col = 0; col < M; col++)
@@ -387,31 +347,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
         //maybe priority queue?
         //sort(data.satisfied_by.begin(), data.satisfied_by.end(), comparatorSatisfied());
 
-        /*if( debug )
-        {
-            printf("satisfied by amount:\n");
-            for(int s = 0; s <= M; s++)
-            {
-                printf("Sat amount=%d\n", s);
-                for(int i = 0; i < (int)data.satisfied_by_amount[s].size(); i++)
-                {
-                    int v = data.satisfied_by_amount[s][i];
-                    unsigned int mask8 = (1 << 8) - 1;
-                    int position_row = v & mask8; v >>= 8;
-                    int position_col = v & mask8; v >>= 8;
-                    int satisfied_by_mask = v & mask8;
-                    
-                    printf("row: %d, col:%d, satmask: ", position_row, position_col);
-                    for(int j = 0; j < M; j++)
-                        if( satisfied_by_mask & (1 << j) )
-                            printf("1");
-                        else
-                            printf("0");
-                    printf("\n");
-                }
-            }
-        }*/
-
         bool everyone_satisfied = true;
         while( everyone_satisfied && (to_satisfy != already_satisfied) && ((int)data.satisfied_by_amount[0].size() == 0) )
         {
@@ -422,7 +357,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                 //printf("already satisfied:\n");
                 //print_subset(already_satisfied);
                 
-                //std::sort(data.satisfied_by_amount[sat_amount].begin(), data.satisfied_by_amount[sat_amount].end(), std::greater<int>());
                 int satisfied_by_amount_size = data.satisfied_by_amount[sat_amount].size();
                 //for(int sat_amount_idx = 0; sat_amount_idx < satisfied_by_amount_size; sat_amount_idx++)
                 if( satisfied_by_amount_size > 0 )
@@ -519,8 +453,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                             if( get_one_value(group_to_satisfy, grouprow, col) && ( (get_col( result, col ) & data.group_mask[grouprow]) != 0ULL ) )
                                 group_satisfied |= set_one_value(group_satisfied, grouprow, col);
                         }
-                        
-                        //break;
                     }
 
                     for(int s = 1; s <= M; s++)
@@ -546,28 +478,6 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
                                 it++;
                         }
                     }
-
-                    /*std::cout << "after swapping:\n";
-                    for(int s = 0; s <= M; s++)
-                    {
-                        printf("Sat amount=%d\n", s);
-                        for(int i = 0; i < data.satisfied_by_amount[s].size(); i++)
-                        {
-                            int v = data.satisfied_by_amount[s][i];
-                            unsigned int mask8 = (1 << 8) - 1;
-                            int position_row = v & mask8; v >>= 8;
-                            int position_col = v & mask8; v >>= 8;
-                            int satisfied_by_mask = v & mask8;
-                            
-                            printf("row: %d, col:%d, satmask: ", position_row, position_col);
-                            for(int j = 0; j < M; j++)
-                                if( satisfied_by_mask & (1 << j) )
-                                    printf("1");
-                                else
-                                    printf("0");
-                            printf("\n");
-                        }
-                    }*/
 
                     if( get_one_value(already_satisfied, position_row, position_col) == 0 )
                         everyone_satisfied = false;
