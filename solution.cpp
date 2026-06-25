@@ -30,7 +30,8 @@ typedef unsigned long long int LLI;
 //constexpr int N = 8, M = 8;
 Sub generalfirstcolmask;
 //Sub generalfirstrowmask;
-std::vector< std::vector<int> > rowmoves;
+std::vector<int> rowmoves[16777220]; //all possible moves of rows, size: 8^8
+int count_row_moves;
 
 std::vector< std::vector<int> > generate_moves(int dim)
 {
@@ -95,7 +96,7 @@ struct BackwardData
     
     inline void Initialize()
     {
-        for(int i = 0; i < (int)rowmoves.size(); i++)
+        for(int i = 0; i < count_row_moves; i++)
             list_row_moves.push_back(i);
     }
 
@@ -824,7 +825,6 @@ int main(int argc, char** argv)
     bool is_inverted = true;
     //int howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col;
     //std::cin >> N >> M >> howmanyones_lower_row >> howmanyones_upper_row >> howmanyones_lower_col >> howmanyones_upper_col;
-    //M = N;
     int howmanyones_lower_row = 2, howmanyones_upper_row = M - 2, howmanyones_lower_col = 2, howmanyones_upper_col = N - 2;
 
     std::ofstream output_file, wrong_file;
@@ -848,13 +848,15 @@ int main(int argc, char** argv)
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
 
-    rowmoves = generate_moves(N);
-
+    std::vector< std::vector<int> > tmp_rowmoves = generate_moves(N);
+    count_row_moves = tmp_rowmoves.size();
     /*std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(rowmoves.begin(), rowmoves.end(), g);*/
     srand(67);
-    std::random_shuffle(rowmoves.begin(), rowmoves.end());
+    std::random_shuffle(tmp_rowmoves.begin(), tmp_rowmoves.end());
+    for(int i = 0; i < count_row_moves; i++)
+        rowmoves[i] = tmp_rowmoves[i];
 
     /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
