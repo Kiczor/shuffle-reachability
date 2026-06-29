@@ -30,15 +30,16 @@ typedef unsigned long long int LLI;
 //constexpr int N = 8, M = 8;
 Sub generalfirstcolmask;
 //Sub generalfirstrowmask;
-std::vector<int> rowmoves[16777220]; //all possible moves of rows, size: 8^8
+constexpr int maximum_moves_size = 16777216; // 8^8
+int rowmoves[maximum_moves_size + 5][maxN]; //all possible moves of rows, size: 8^8
 int count_row_moves;
 
-std::vector< std::vector<int> > generate_moves(int dim)
+void generate_moves(int dim)
 {
     std::vector< std::vector<int> > result;
     for(int r = 0; r < dim; r++)
     {
-        std::vector<int> mv; mv.reserve(M);
+        std::vector<int> mv; mv.reserve(dim);
         mv.push_back(r);
         result.push_back(mv);
     }
@@ -62,7 +63,10 @@ std::vector< std::vector<int> > generate_moves(int dim)
         result = newresult;
     }
 
-    return result;
+    count_row_moves = (int)result.size();
+    for(int i = 0; i < count_row_moves; i++)
+        for(int j = 0; j < N; j++)
+            rowmoves[i][j] = result[i][j];
 }
 
 //comparator for sorting satisfiedby
@@ -148,7 +152,7 @@ void backwardgood(Sub to, BackwardData &data, bool debug)
     for(auto row_move_iterator = data.list_row_moves.begin(); row_move_iterator != data.list_row_moves.end(); row_move_iterator++)
     {
         int row_move_index = *row_move_iterator;
-        std::vector<int>& row_move = rowmoves[row_move_index];
+        int (&row_move)[maxN] = rowmoves[row_move_index];
         //zero data
         data.ZeroData();
         
@@ -774,6 +778,103 @@ std::pair< std::unique_ptr<CasesGenerator>, std::unique_ptr<std::vector<Sub>> > 
     return make_pair(std::move(gen), std::move(result));
 }
 
+void find_worst_cases(int howmanyones_lower_row, int howmanyones_upper_row, int howmanyones_lower_col, int howmanyones_upper_col)
+{
+    std::unordered_map<Sub, int> sub_steps;
+    std::vector< std::pair<int, Sub> > result;
+    std::vector< Sub > allval;
+    BackwardData data;
+    data.Initialize();
+
+    CasesGenerator generator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
+    generator.start_generator();
+    int countbatch = 0;
+    while( !generator.all_generated )
+    {
+        std::unique_ptr<std::vector<Sub>> batch = generator.generate_with_ones_batch_inverted(100000, true);
+        std::cout << "got batch" << countbatch++ << "\n";
+        for(auto &val : (*batch))
+        {
+            Sub s = val;
+            int steps = 0;
+            std::vector<Sub> visited; visited.reserve(15);
+            while( std::popcount(s) > 2 )
+            {
+                if( sub_steps.find( s ) != sub_steps.end() )
+                {
+                    steps += sub_steps[s];
+                    sub_steps[val] = steps;
+                    break;
+                }
+
+                visited.push_back(s);
+
+                data.ZeroResult();
+                backwardgood(s, data, false);
+
+                Sub checkresult = check(data.back_result.first, data.back_result.second.first, data.back_result.second.second);
+
+                if( (data.back_result.first == 0) || (checkresult != s) )
+                {
+                    printf("empty!!!\n");
+                    print_subset(s);
+                    return;
+                }
+
+                s = data.back_result.first;
+
+                steps++;
+            }
+
+            if( sub_steps.find(val) == sub_steps.end() )
+                sub_steps[val] = steps;
+            else
+                sub_steps[val] = std::min(sub_steps[val], steps);
+
+            for(int i = 1; i < (int)visited.size(); i++)
+            {
+                int u = visited[i];
+                steps--;
+                if( sub_steps.find(u) == sub_steps.end() )
+                    sub_steps[u] = steps;
+                else
+                    sub_steps[u] = std::min(sub_steps[u], steps);
+            }
+
+            allval.push_back(val);
+        }
+    }
+
+    result.reserve(allval.size());
+    for(int i = 0; i < allval.size(); i++)
+        result.push_back( std::make_pair(sub_steps[ allval[i] ], allval[i]) );
+
+    sort(result.begin(), result.end());
+    reverse(result.begin(), result.end());
+
+    for(int i = 0; i < 100; i++)
+    {
+        std::cout << "steps=" << result[i].first << ", subset=" << result[i].second << "\n";
+        print_subset(result[i].second);
+        int row_ones_min=100, row_ones_max=0, col_ones_min=100, col_ones_max=0;
+        for(int row = 0; row < N; row++)
+        {
+            int ones = std::popcount(get_row( result[i].second, row ));
+            row_ones_min = std::min(row_ones_min, ones);
+            row_ones_max = std::max(row_ones_max, ones);
+        }
+        for(int col = 0; col < M; col++)
+        {
+            int ones = std::popcount(get_col( result[i].second, col));
+            col_ones_min = std::min(col_ones_min, ones);
+            col_ones_max = std::max(col_ones_max, ones);
+        }
+
+        std::cout << "rows min ones: " << row_ones_min << ", rows max ones: " << row_ones_max;
+        std::cout << ", cols min ones: " << col_ones_min << ", cols max ones: " << col_ones_max << ", alltogether ones: " << std::popcount( result[i].second ) << "\n";
+    }
+}
+
 int main(int argc, char** argv)
 {
     int number_of_threads = 1;
@@ -848,15 +949,15 @@ int main(int argc, char** argv)
     end_position_rows = std::min(end_position_rows, possible_rows_size);
 
 
-    std::vector< std::vector<int> > tmp_rowmoves = generate_moves(N);
-    count_row_moves = tmp_rowmoves.size();
+    generate_moves(N);
     /*std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(rowmoves.begin(), rowmoves.end(), g);*/
     srand(67);
-    std::random_shuffle(tmp_rowmoves.begin(), tmp_rowmoves.end());
-    for(int i = 0; i < count_row_moves; i++)
-        rowmoves[i] = tmp_rowmoves[i];
+    std::random_shuffle(rowmoves, rowmoves + count_row_moves);
+
+    //find_worst_cases(howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col);
+    //return 0;
 
     /*CasesGenerator mygenerator = CasesGenerator(N, M, howmanyones_lower_row, howmanyones_upper_row, howmanyones_lower_col, howmanyones_upper_col, true, 0, 1000);
     mygenerator.start_generator();
@@ -1016,6 +1117,8 @@ int main(int argc, char** argv)
 
             calculated[result.first] = true;
             count_collected++;
+
+            if(count_collected >= 100) return 0;
 
             if( result.second.size() > 0 )
             {
