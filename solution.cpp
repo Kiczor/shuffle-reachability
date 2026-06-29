@@ -1118,8 +1118,6 @@ int main(int argc, char** argv)
             calculated[result.first] = true;
             count_collected++;
 
-            if(count_collected >= 100) return 0;
-
             if( result.second.size() > 0 )
             {
                 //WRONG!!!
